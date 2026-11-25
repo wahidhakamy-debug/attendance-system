@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>بوابة الموارد البشرية - تسجيل الدخول</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background: linear-gradient(135deg, #0f172a, #1e293b); margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .card { background: #ffffff; padding: 45px; border-radius: 20px; width: 100%; max-width: 450px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); text-align: center; }
+        h2 { color: #0284c7; font-size: 28px; margin-bottom: 8px; }
+        p { color: #64748b; font-size: 18px; margin-bottom: 30px; }
+        .group { text-align: right; margin-bottom: 20px; }
+        label { display: block; font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #1e293b; }
+        input { width: 100%; padding: 14px; font-size: 18px; border: 2px solid #cbd5e1; border-radius: 10px; }
+        input:focus { outline: none; border-color: #0284c7; }
+        button { width: 100%; padding: 15px; font-size: 20px; font-weight: bold; background: #0284c7; color: white; border: none; border-radius: 10px; cursor: pointer; margin-top: 10px; }
+        button:hover { background: #0369a1; }
+        .alert { background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 16px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🛡️ نظام الموارد البشرية</h2>
+        <p>بوابة الحضور والانصراف الذكية</p>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}<div class="alert">{{ messages }}</div>{% endif %}
+        {% endwith %}
+        <form method="POST">
+            <div class="group">
+                <label>الرقم الوظيفي</label>
+                <input type="text" name="emp_id" placeholder="مثال: admin أو 1001" required>
+            </div>
+            <div class="group">
+                <label>كلمة المرور</label>
+                <input type="password" name="password" placeholder="••••••" required>
+            </div>
+            <button type="submit">تسجيل الدخول</button>
+        </form>
+    </div>
+</body>
+</html>

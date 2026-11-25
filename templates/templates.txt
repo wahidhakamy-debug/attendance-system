@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>بوابة الموارد البشرية - تسجيل الدخول</title>
+    <link href="https://jsdelivr.net" rel="stylesheet">
+    <link href="https://googleapis.com" rel="stylesheet">
+    <style>
+        body { background: #0f172a; font-family: 'Tajawal', sans-serif; min-height: 100vh; display: flex; align-items: center; }
+        .login-card { max-width: 460px; width: 100%; margin: auto; border-radius: 20px; }
+        .form-control { font-size: 1.2rem; padding: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card login-card p-4 p-md-5 bg-white shadow">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold text-primary">نظام الموارد البشرية</h2>
+            <p class="text-muted fs-5">بوابة الحضور والانصراف الذكية</p>
+        </div>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}<div class="alert alert-danger fs-5 text-center">{{ messages }}</div>{% endif %}
+        {% endwith %}
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label fs-5 fw-bold">الرقم الوظيفي</label>
+                <input type="text" name="emp_id" class="form-control" placeholder="admin أو 1001" required>
+            </div>
+            <div class="mb-4">
+                <label class="form-label fs-5 fw-bold">كلمة المرور</label>
+                <input type="password" name="password" class="form-control" placeholder="123456" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-3 fs-4 fw-bold">تسجيل الدخول</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>
