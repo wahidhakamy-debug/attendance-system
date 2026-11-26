@@ -56,7 +56,7 @@ def init_db():
     b_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM branches", fetch='one')[0]
     if b_count == 0:
         run_query(conn, is_pg, "INSERT INTO branches (name, lat, lon, radius, start_time, end_time, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  ('الفرع الرئيسي', 16.9688, 42.8325, 200, '08:00', '16:00', 15))
+        run_query(conn, is_pg, "UPDATE attendance SET overtime_minutes = 0 WHERE work_hours NOT LIKE '8 س%' AND work_hours NOT LIKE '9 س%' AND work_hours NOT LIKE '1%'")
 
     e_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM employees", fetch='one')[0]
     if e_count == 0:
