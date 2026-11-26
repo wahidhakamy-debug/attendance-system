@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, session, flash, Response
-import os, sqlite3, csv, io, math
+import os, sqlite3, csv, io, math, json
+import urllib.request
 from datetime import datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -7,9 +8,22 @@ app = Flask(__name__)
 app.secret_key = 'wahid_hr_pro_system_v2_2026'
 KSA_TZ = timezone(timedelta(hours=3))
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
 
 def get_ksa_time():
     return datetime.now(KSA_TZ)
+
+def send_telegram(msg):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    try:
+        url = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
+        data = json.dumps({"chat_id": TELEGRAM_CHAT_ID, "text": msg}).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
 
 def get_db():
     if DATABASE_URL:
@@ -45,6 +59,7 @@ def init_db():
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS employees (id {pk}, emp_id TEXT UNIQUE, name TEXT, department TEXT, job_title TEXT, assigned_branch TEXT, password TEXT, role TEXT)')
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS branches (id {pk}, name TEXT, lat REAL, lon REAL, radius INTEGER, start_time TEXT DEFAULT '08:00', end_time TEXT DEFAULT '16:00', grace_period INTEGER DEFAULT 15)")
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS attendance (id {pk}, emp_id TEXT, branch_name TEXT, date TEXT, check_in TEXT, check_out TEXT, work_hours TEXT, late_minutes INTEGER DEFAULT 0, overtime_minutes INTEGER DEFAULT 0, ip_address TEXT)')
+    run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS leave_requests (id {pk}, emp_id TEXT, emp_name TEXT, req_type TEXT, req_date TEXT, duration_text TEXT, reason TEXT, status TEXT DEFAULT 'قيد المراجعة', created_at TEXT)")
     conn.commit()
 
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN start_time TEXT DEFAULT '08:00'")
@@ -52,6 +67,7 @@ def init_db():
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN grace_period INTEGER DEFAULT 15")
     safe_alter(conn, is_pg, "ALTER TABLE attendance ADD COLUMN late_minutes INTEGER DEFAULT 0")
     safe_alter(conn, is_pg, "ALTER TABLE attendance ADD COLUMN overtime_minutes INTEGER DEFAULT 0")
+
     b_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM branches", fetch='one')[0]
     if b_count == 0:
         run_query(conn, is_pg, "INSERT INTO branches (name, lat, lon, radius, start_time, end_time, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -65,7 +81,6 @@ def init_db():
     conn.close()
 
 init_db()
-
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     R = 6371000
@@ -133,11 +148,13 @@ def dashboard():
         params.append(end_date)
     query += " ORDER BY a.id DESC"
     raw_records = run_query(conn, is_pg, query, tuple(params), fetch='all')
+    records = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], format_mins(r[8]), r[9], format_mins(r[9])) for r in raw_records]
     
-    records = []
-    for r in raw_records:
-        records.append((r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], format_mins(r[8]), r[9], format_mins(r[9])))
-    
+    if session['role'] == 'admin':
+        leaves = run_query(conn, is_pg, "SELECT id, emp_id, emp_name, req_type, req_date, duration_text, reason, status FROM leave_requests ORDER BY id DESC", fetch='all')
+    else:
+        leaves = run_query(conn, is_pg, "SELECT id, emp_id, emp_name, req_type, req_date, duration_text, reason, status FROM leave_requests WHERE emp_id = ? ORDER BY id DESC", (session['emp_id'],), fetch='all')
+
     stats, employees, branches = {}, [], []
     if session['role'] == 'admin':
         employees = run_query(conn, is_pg, "SELECT emp_id, name, department, job_title, assigned_branch, role FROM employees", fetch='all')
@@ -146,7 +163,7 @@ def dashboard():
         active = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE date = ? AND check_out IS NULL", (today,), fetch='one')[0]
         stats = {'total_emp': len(employees), 'present_today': present, 'active_now': active}
     conn.close()
-    return render_template('dashboard.html', now_time=now.strftime('%H:%M:%S'), now_date=today, today_rec=today_rec, records=records, stats=stats, employees=employees, branches=branches, emp_filter=emp_filter, start_date=start_date, end_date=end_date)
+    return render_template('dashboard.html', now_time=now.strftime('%H:%M:%S'), now_date=today, today_rec=today_rec, records=records, leaves=leaves, stats=stats, employees=employees, branches=branches, emp_filter=emp_filter, start_date=start_date, end_date=end_date)
 
 @app.route('/action/<type>', methods=['POST'])
 def action(type):
@@ -200,8 +217,9 @@ def action(type):
         
         run_query(conn, is_pg, "INSERT INTO attendance (emp_id, branch_name, date, check_in, late_minutes, ip_address) VALUES (?, ?, ?, ?, ?, ?)",
                   (session['emp_id'], b_name, today, t_str, late_mins, request.remote_addr))
-        late_msg = f" | ⚠️ تأخير: {format_mins(late_mins)}" if late_mins > 0 else " | ✅ حضور منضبط"
-        flash(f'✅ تم تسجيل حضورك في ({b_name}) الساعة {t_str}{late_msg}')
+        late_txt = f"⚠️ تأخير: {format_mins(late_mins)}" if late_mins > 0 else "✅ منضبط"
+        flash(f'✅ تم تسجيل حضورك في ({b_name}) الساعة {t_str} | {late_txt}')
+        send_telegram(f"🟢 تسجيل حضور\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {b_name}\nالوقت: {t_str}\nالحالة: {late_txt}")
         
     elif type == 'out' and rec and not rec[2]:
         dur = calculate_duration(rec[1], t_str)
@@ -209,23 +227,50 @@ def action(type):
         b_start = b_info[0] if b_info else matched_branch[5]
         b_end = b_info[1] if b_info else matched_branch[6]
         
-        in_dt = datetime.strptime(rec[1], '%H:%M:%S')
-        out_dt = datetime.strptime(t_str, '%H:%M:%S')
-        worked_mins = max(0, int((out_dt - in_dt).total_seconds() // 60))
-        
-        start_dt = datetime.strptime(b_start, '%H:%M')
-        end_dt = datetime.strptime(b_end, '%H:%M')
-        required_mins = max(0, int((end_dt - start_dt).total_seconds() // 60))
-        
+        worked_mins = max(0, int((datetime.strptime(t_str, '%H:%M:%S') - datetime.strptime(rec[1], '%H:%M:%S')).total_seconds() // 60))
+        required_mins = max(0, int((datetime.strptime(b_end, '%H:%M') - datetime.strptime(b_start, '%H:%M')).total_seconds() // 60))
         ot_mins = max(0, worked_mins - required_mins) if worked_mins > required_mins else 0
         
         run_query(conn, is_pg, "UPDATE attendance SET check_out = ?, work_hours = ?, overtime_minutes = ? WHERE id = ?",
                   (t_str, dur, ot_mins, rec[0]))
-        ot_msg = f" | ⭐ عمل إضافي: {format_mins(ot_mins)}" if ot_mins > 0 else ""
-        flash(f'🚪 تم تسجيل انصرافك من ({rec[3]}) الساعة {t_str} | ساعات العمل: {dur}{ot_msg}')
+        ot_txt = f" | ⭐ إضافي: {format_mins(ot_mins)}" if ot_mins > 0 else ""
+        flash(f'🚪 تم تسجيل انصرافك من ({rec[3]}) الساعة {t_str} | ساعات العمل: {dur}{ot_txt}')
+        send_telegram(f"🔴 تسجيل انصراف\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {rec[3]}\nالوقت: {t_str}\nساعات العمل: {dur}{ot_txt}")
         
     conn.commit()
     conn.close()
+    return redirect('/dashboard')
+
+@app.route('/submit_leave', methods=['POST'])
+def submit_leave():
+    if 'emp_id' not in session:
+        return redirect('/')
+    req_type = request.form['req_type']
+    req_date = request.form['req_date']
+    duration_text = request.form['duration_text'].strip()
+    reason = request.form['reason'].strip()
+    now_str = get_ksa_time().strftime('%Y-%m-%d %H:%M')
+    
+    conn, is_pg = get_db()
+    run_query(conn, is_pg, "INSERT INTO leave_requests (emp_id, emp_name, req_type, req_date, duration_text, reason, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'قيد المراجعة', ?)",
+              (session['emp_id'], session['name'], req_type, req_date, duration_text, reason, now_str))
+    conn.commit()
+    conn.close()
+    
+    flash('✅ تم إرسال طلبك للإدارة بنجاح!')
+    send_telegram(f"📩 طلب جديد ({req_type})\nالموظف: {session['name']} ({session['emp_id']})\nالتاريخ: {req_date}\nالمدة: {duration_text}\nالسبب: {reason}")
+    return redirect('/dashboard')
+
+@app.route('/handle_leave/<int:req_id>/<decision>')
+def handle_leave(req_id, decision):
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    status = 'مقبول ✅' if decision == 'approve' else 'مرفوض ❌'
+    conn, is_pg = get_db()
+    run_query(conn, is_pg, "UPDATE leave_requests SET status = ? WHERE id = ?", (status, req_id))
+    conn.commit()
+    conn.close()
+    flash(f'تم تحديث حالة الطلب إلى: {status}')
     return redirect('/dashboard')
 
 @app.route('/add_branch', methods=['POST'])
