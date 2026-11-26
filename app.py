@@ -52,8 +52,6 @@ def init_db():
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN grace_period INTEGER DEFAULT 15")
     safe_alter(conn, is_pg, "ALTER TABLE attendance ADD COLUMN late_minutes INTEGER DEFAULT 0")
     safe_alter(conn, is_pg, "ALTER TABLE attendance ADD COLUMN overtime_minutes INTEGER DEFAULT 0")
-    run_query(conn, is_pg, "UPDATE attendance SET overtime_minutes = 0 WHERE work_hours NOT LIKE '8 س%' AND work_hours NOT LIKE '9 س%' AND work_hours NOT LIKE '1%'")
-
     b_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM branches", fetch='one')[0]
     if b_count == 0:
         run_query(conn, is_pg, "INSERT INTO branches (name, lat, lon, radius, start_time, end_time, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)",
