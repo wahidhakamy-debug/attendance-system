@@ -35,17 +35,17 @@ def run_query(conn, is_pg, query, params=(), fetch=None):
 def safe_alter(conn, is_pg, sql):
     try:
         run_query(conn, is_pg, sql)
-    conn.commit()
+        conn.commit()
     except Exception:
-    conn.rollback()
+        conn.rollback()
 
 def init_db():
-    conn, is_pg = get_db()
+        conn, is_pg = get_db()
     pk = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY"
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS employees (id {pk}, emp_id TEXT UNIQUE, name TEXT, department TEXT, job_title TEXT, assigned_branch TEXT, password TEXT, role TEXT)')
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS branches (id {pk}, name TEXT, lat REAL, lon REAL, radius INTEGER, start_time TEXT DEFAULT '08:00', end_time TEXT DEFAULT '16:00', grace_period INTEGER DEFAULT 15)")
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS attendance (id {pk}, emp_id TEXT, branch_name TEXT, date TEXT, check_in TEXT, check_out TEXT, work_hours TEXT, late_minutes INTEGER DEFAULT 0, overtime_minutes INTEGER DEFAULT 0, ip_address TEXT)')
-    conn.commit()
+        conn.commit()
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN start_time TEXT DEFAULT '08:00'")
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN end_time TEXT DEFAULT '16:00'")
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN grace_period INTEGER DEFAULT 15")
