@@ -46,7 +46,7 @@ def init_db():
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS branches (id {pk}, name TEXT, lat REAL, lon REAL, radius INTEGER, start_time TEXT DEFAULT '08:00', end_time TEXT DEFAULT '16:00', grace_period INTEGER DEFAULT 15)")
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS attendance (id {pk}, emp_id TEXT, branch_name TEXT, date TEXT, check_in TEXT, check_out TEXT, work_hours TEXT, late_minutes INTEGER DEFAULT 0, overtime_minutes INTEGER DEFAULT 0, ip_address TEXT)')
     conn.commit()
-run_query(conn, is_pg, "UPDATE attendance SET overtime_minutes = 0 WHERE emp_id = '1001' AND date = '2026-11-26'
+    run_query(conn, is_pg, "UPDATE attendance SET overtime_minutes = 0 WHERE emp_id = '1001' AND date = '2026-11-26'
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN start_time TEXT DEFAULT '08:00'")
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN end_time TEXT DEFAULT '16:00'")
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN grace_period INTEGER DEFAULT 15")
