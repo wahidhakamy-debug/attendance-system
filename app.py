@@ -47,7 +47,6 @@ def init_db():
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS attendance (id {pk}, emp_id TEXT, branch_name TEXT, date TEXT, check_in TEXT, check_out TEXT, work_hours TEXT, late_minutes INTEGER DEFAULT 0, overtime_minutes INTEGER DEFAULT 0, ip_address TEXT)')
     conn.commit()
 
-    # إضافة الأعمدة الجديدة للجداول الحالية دون مسح البيانات السابقة
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN start_time TEXT DEFAULT '08:00'")
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN end_time TEXT DEFAULT '16:00'")
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN grace_period INTEGER DEFAULT 15")
@@ -203,8 +202,8 @@ def action(type):
                   (session['emp_id'], b_name, today, t_str, late_mins, request.remote_addr))
         late_msg = f" | ⚠️ تأخير: {format_mins(late_mins)}" if late_mins > 0 else " | ✅ حضور منضبط"
         flash(f'✅ تم تسجيل حضورك في ({b_name}) الساعة {t_str}{late_msg}')
-    
-        elif type == 'out' and rec and not rec[2]:
+        
+    elif type == 'out' and rec and not rec[2]:
         dur = calculate_duration(rec[1], t_str)
         b_info = run_query(conn, is_pg, "SELECT COALESCE(start_time, '08:00'), COALESCE(end_time, '16:00') FROM branches WHERE name = ?", (rec[3],), fetch='one')
         b_start = b_info[0] if b_info else matched_branch[5]
@@ -218,31 +217,12 @@ def action(type):
         end_dt = datetime.strptime(b_end, '%H:%M')
         required_mins = max(0, int((end_dt - start_dt).total_seconds() // 60))
         
-        # لا يُحتسب العمل الإضافي إلا إذا تجاوزت ساعات عمله الفعلية ساعات الدوام الرسمي للفرع
         ot_mins = max(0, worked_mins - required_mins) if worked_mins > required_mins else 0
         
         run_query(conn, is_pg, "UPDATE attendance SET check_out = ?, work_hours = ?, overtime_minutes = ? WHERE id = ?",
                   (t_str, dur, ot_mins, rec[0]))
         ot_msg = f" | ⭐ عمل إضافي: {format_mins(ot_mins)}" if ot_mins > 0 else ""
         flash(f'🚪 تم تسجيل انصرافك من ({rec[3]}) الساعة {t_str} | ساعات العمل: {dur}{ot_msg}')
-    
-        
-        in_dt = datetime.strptime(rec[1], '%H:%M:%S')
-        out_dt = datetime.strptime(t_str, '%H:%M:%S')
-        worked_mins = max(0, int((out_dt - in_dt).total_seconds() // 60))
-        
-        start_dt = datetime.strptime(b_start, '%H:%M')
-        end_dt = datetime.strptime(b_end, '%H:%M')
-        required_mins = max(0, int((end_dt - start_dt).total_seconds() // 60))
-        
-        # لا يُحتسب العمل الإضافي إلا إذا تجاوزت ساعات عمله الفعلية ساعات الدوام الرسمي للفرع
-        ot_mins = max(0, worked_mins - required_mins) if worked_mins > required_mins else 0
-        
-        run_query(conn, is_pg, "UPDATE attendance SET check_out = ?, work_hours = ?, overtime_minutes = ? WHERE id = ?",
-                  (t_str, dur, ot_mins, rec[0]))
-        ot_msg = f" | ⭐ عمل إضافي: {format_mins(ot_mins)}" if ot_mins > 0 else ""
-        flash(f'🚪 تم تسجيل انصرافك من ({rec[3]}) الساعة {t_str} | ساعات العمل: {dur}{ot_msg}')
-
         
     conn.commit()
     conn.close()
