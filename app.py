@@ -45,13 +45,13 @@ def init_db():
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS employees (id {pk}, emp_id TEXT UNIQUE, name TEXT, department TEXT, job_title TEXT, assigned_branch TEXT, password TEXT, role TEXT)')
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS branches (id {pk}, name TEXT, lat REAL, lon REAL, radius INTEGER, start_time TEXT DEFAULT '08:00', end_time TEXT DEFAULT '16:00', grace_period INTEGER DEFAULT 15)")
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS attendance (id {pk}, emp_id TEXT, branch_name TEXT, date TEXT, check_in TEXT, check_out TEXT, work_hours TEXT, late_minutes INTEGER DEFAULT 0, overtime_minutes INTEGER DEFAULT 0, ip_address TEXT)')
-    conn.commit()
-run_query(conn, is_pg, "UPDATE attendance SET overtime_minutes = 0 WHERE emp_id = '1001' AND date = '2026-11-26'")
+        conn.commit()
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN start_time TEXT DEFAULT '08:00'")
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN end_time TEXT DEFAULT '16:00'")
     safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN grace_period INTEGER DEFAULT 15")
     safe_alter(conn, is_pg, "ALTER TABLE attendance ADD COLUMN late_minutes INTEGER DEFAULT 0")
     safe_alter(conn, is_pg, "ALTER TABLE attendance ADD COLUMN overtime_minutes INTEGER DEFAULT 0")
+    run_query(conn, is_pg, "UPDATE attendance SET overtime_minutes = 0 WHERE emp_id = '1001' AND date = '2026-11-26'")
 
     b_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM branches", fetch='one')[0]
     if b_count == 0:
