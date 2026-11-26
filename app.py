@@ -201,3 +201,139 @@ def action(type):
         
         run_query(conn, is_pg, "INSERT INTO attendance (emp_id, branch_name, date, check_in, late_minutes, ip_address) VALUES (?, ?, ?, ?, ?, ?)",
                   (session['emp_id'], b_name, today, t_str, late_mins, request.remote_addr))
+        late_msg = f" | ⚠️ تأخير: {format_mins(late_mins)}" if late_mins > 0 else " | ✅ حضور منضبط"
+        flash(f'✅ تم تسجيل حضورك في ({b_name}) الساعة {t_str}{late_msg}')
+        
+    elif type == 'out' and rec and not rec[2]:
+        dur = calculate_duration(rec[1], t_str)
+        b_info = run_query(conn, is_pg, "SELECT COALESCE(end_time, '16:00') FROM branches WHERE name = ?", (rec[3],), fetch='one')
+        b_end = b_info[0] if b_info else matched_branch[6]
+        out_dt = datetime.strptime(t_str, '%H:%M:%S')
+        end_dt = datetime.strptime(b_end, '%H:%M')
+        ot_mins = int((out_dt - end_dt).total_seconds() // 60) if out_dt > end_dt else 0
+        
+        run_query(conn, is_pg, "UPDATE attendance SET check_out = ?, work_hours = ?, overtime_minutes = ? WHERE id = ?",
+                  (t_str, dur, ot_mins, rec[0]))
+        ot_msg = f" | ⭐ عمل إضافي: {format_mins(ot_mins)}" if ot_mins > 0 else ""
+        flash(f'🚪 تم تسجيل انصرافك من ({rec[3]}) الساعة {t_str} | ساعات العمل: {dur}{ot_msg}')
+        
+    conn.commit()
+    conn.close()
+    return redirect('/dashboard')
+
+@app.route('/add_branch', methods=['POST'])
+def add_branch():
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    conn, is_pg = get_db()
+    run_query(conn, is_pg, "INSERT INTO branches (name, lat, lon, radius, start_time, end_time, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              (request.form['name'].strip(), float(request.form['lat']), float(request.form['lon']), int(request.form['radius']),
+               request.form['start_time'], request.form['end_time'], int(request.form['grace_period'])))
+    conn.commit()
+    conn.close()
+    flash('✅ تم إضافة الفرع ومواعيد دوامه بنجاح!')
+    return redirect('/dashboard')
+
+@app.route('/edit_branch/<int:b_id>', methods=['POST'])
+def edit_branch(b_id):
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    conn, is_pg = get_db()
+    run_query(conn, is_pg, "UPDATE branches SET name=?, lat=?, lon=?, radius=?, start_time=?, end_time=?, grace_period=? WHERE id=?",
+              (request.form['name'].strip(), float(request.form['lat']), float(request.form['lon']), int(request.form['radius']),
+               request.form['start_time'], request.form['end_time'], int(request.form['grace_period']), b_id))
+    conn.commit()
+    conn.close()
+    flash('✅ تم حفظ تعديلات الفرع ومواعيد الدوام بنجاح!')
+    return redirect('/dashboard')
+
+@app.route('/delete_branch/<int:b_id>')
+def delete_branch(b_id):
+    if session.get('role') == 'admin':
+        conn, is_pg = get_db()
+        run_query(conn, is_pg, "DELETE FROM branches WHERE id = ?", (b_id,))
+        conn.commit()
+        conn.close()
+        flash('تم حذف الفرع')
+    return redirect('/dashboard')
+
+@app.route('/add_employee', methods=['POST'])
+def add_employee():
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    conn, is_pg = get_db()
+    try:
+        run_query(conn, is_pg, "INSERT INTO employees (emp_id, name, department, job_title, assigned_branch, password, role) VALUES (?, ?, ?, ?, ?, ?, 'employee')",
+                  (request.form['emp_id'].strip(), request.form['name'].strip(), request.form['department'].strip(), request.form['job_title'].strip(), request.form['assigned_branch'], generate_password_hash(request.form['password'].strip())))
+        conn.commit()
+        flash('✅ تم إضافة الموظف وربطه بفرعه بنجاح!')
+    except Exception:
+        conn.rollback()
+        flash('❌ خطأ: الرقم الوظيفي مسجل مسبقاً!')
+    conn.close()
+    return redirect('/dashboard')
+
+@app.route('/edit_employee/<emp_id>', methods=['POST'])
+def edit_employee(emp_id):
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    conn, is_pg = get_db()
+    name, dept, title, branch = request.form['name'].strip(), request.form['department'].strip(), request.form['job_title'].strip(), request.form['assigned_branch']
+    new_pass = request.form.get('password', '').strip()
+    if new_pass:
+        run_query(conn, is_pg, "UPDATE employees SET name=?, department=?, job_title=?, assigned_branch=?, password=? WHERE emp_id=?",
+                  (name, dept, title, branch, generate_password_hash(new_pass), emp_id))
+    else:
+        run_query(conn, is_pg, "UPDATE employees SET name=?, department=?, job_title=?, assigned_branch=? WHERE emp_id=?",
+                  (name, dept, title, branch, emp_id))
+    conn.commit()
+    conn.close()
+    flash('✅ تم حفظ تعديلات الموظف بنجاح!')
+    return redirect('/dashboard')
+
+@app.route('/delete_emp/<emp_id>')
+def delete_emp(emp_id):
+    if session.get('role') == 'admin' and emp_id != 'admin':
+        conn, is_pg = get_db()
+        run_query(conn, is_pg, "DELETE FROM employees WHERE emp_id = ?", (emp_id,))
+        conn.commit()
+        conn.close()
+        flash('تم حذف الموظف')
+    return redirect('/dashboard')
+
+@app.route('/export_csv')
+def export_csv():
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    emp_filter, start_date, end_date = request.args.get('emp_id', ''), request.args.get('start_date', ''), request.args.get('end_date', '')
+    query = "SELECT a.emp_id, e.name, e.department, a.branch_name, a.date, a.check_in, a.check_out, a.work_hours, COALESCE(a.late_minutes, 0), COALESCE(a.overtime_minutes, 0) FROM attendance a JOIN employees e ON a.emp_id = e.emp_id WHERE 1=1"
+    params = []
+    if emp_filter:
+        query += " AND a.emp_id = ?"
+        params.append(emp_filter)
+    if start_date:
+        query += " AND a.date >= ?"
+        params.append(start_date)
+    if end_date:
+        query += " AND a.date <= ?"
+        params.append(end_date)
+    query += " ORDER BY a.id DESC"
+    conn, is_pg = get_db()
+    raw_rows = run_query(conn, is_pg, query, tuple(params), fetch='all')
+    conn.close()
+    
+    formatted_rows = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], format_mins(r[8]), format_mins(r[9])) for r in raw_rows]
+    out = io.StringIO()
+    out.write('\ufeff')
+    w = csv.writer(out, delimiter=';')
+    w.writerow(['الرقم الوظيفي', 'الاسم', 'القسم', 'الفرع', 'التاريخ', 'الحضور', 'الانصراف', 'ساعات العمل', 'التأخير', 'العمل الإضافي'])
+    w.writerows(formatted_rows)
+    return Response(out.getvalue(), mimetype="text/csv", headers={"Content-Disposition": "attachment;filename=attendance_report.csv"})
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False)
