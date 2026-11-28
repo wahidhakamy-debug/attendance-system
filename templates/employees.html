@@ -3,7 +3,7 @@
 
 <div class="card">
     <h3 style="margin-top:0; color:#0284c7;">➕ إضافة موظف جديد</h3>
-    <form action="/add_employee" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: end;">
+    <form action="/add_employee" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end;">
         <div><label>الرقم الوظيفي</label><input type="text" name="emp_id" placeholder="1005" required></div>
         <div><label>اسم الموظف</label><input type="text" name="name" placeholder="الاسم الكامل" required></div>
         <div><label>القسم</label><input type="text" name="department" placeholder="المبيعات" required></div>
@@ -13,6 +13,12 @@
             <select name="assigned_branch">
                 <option value="جميع الفروع">🌐 جميع الفروع</option>
                 {% for b in branches %}<option value="{{ b.1 }}">📍 {{ b.1 }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>نظام الدوام (الوردية)</label>
+            <select name="assigned_shift">
+                {% for s in shifts %}<option value="{{ s.1 }}">🕒 {{ s.1 }}</option>{% endfor %}
             </select>
         </div>
         <div><label>كلمة المرور</label><input type="text" name="password" placeholder="123456" required></div>
@@ -25,7 +31,7 @@
     <div style="overflow-x:auto;">
         <table>
             <thead>
-                <tr><th>الرقم</th><th>الاسم</th><th>القسم</th><th>المسمى</th><th>الفرع المخصص</th><th>كلمة مرور جديدة</th><th>إجراء</th></tr>
+                <tr><th>الرقم</th><th>الاسم</th><th>القسم</th><th>المسمى</th><th>الفرع المخصص</th><th>الوردية</th><th>كلمة مرور جديدة</th><th>إجراء</th></tr>
             </thead>
             <tbody>
                 {% for emp in employees %}
@@ -39,6 +45,11 @@
                             <select name="assigned_branch" style="padding:6px; font-size:14px;">
                                 <option value="جميع الفروع" {% if emp.4 == 'جميع الفروع' %}selected{% endif %}>🌐 جميع الفروع</option>
                                 {% for b in branches %}<option value="{{ b.1 }}" {% if emp.4 == b.1 %}selected{% endif %}>📍 {{ b.1 }}</option>{% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            <select name="assigned_shift" style="padding:6px; font-size:14px;">
+                                {% for s in shifts %}<option value="{{ s.1 }}" {% if emp.5 == s.1 %}selected{% endif %}>🕒 {{ s.1 }}</option>{% endfor %}
                             </select>
                         </td>
                         <td><input type="text" name="password" placeholder="اختياري" style="padding:6px; font-size:14px;"></td>
