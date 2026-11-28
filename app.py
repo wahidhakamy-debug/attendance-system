@@ -307,7 +307,7 @@ def action(type):
     done_today = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NOT NULL", (session['emp_id'], today), fetch='one')[0]
     max_sessions = 2 if s_type == 'split' else 1
     
-        if type == 'in' and not open_rec and done_today < max_sessions:
+    if type == 'in' and not open_rec and done_today < max_sessions:
         if s_type == 'flexible':
             late_mins = 0
             late_txt = "🕒 دوام مرن (منضبط)"
