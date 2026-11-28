@@ -62,6 +62,7 @@ def init_db():
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS attendance (id {pk}, emp_id TEXT, branch_name TEXT, date TEXT, check_in TEXT, check_out TEXT, work_hours TEXT, late_minutes INTEGER DEFAULT 0, overtime_minutes INTEGER DEFAULT 0, ip_address TEXT)')
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS leave_requests (id {pk}, emp_id TEXT, emp_name TEXT, req_type TEXT, req_date TEXT, duration_text TEXT, reason TEXT, status TEXT DEFAULT 'قيد المراجعة', created_at TEXT)")
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS advances (id {pk}, emp_id TEXT, emp_name TEXT, adv_type TEXT, amount REAL, deduct_month TEXT, reason TEXT, status TEXT DEFAULT 'قيد المراجعة', created_at TEXT)")
+    run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS emp_documents (id {pk}, emp_id TEXT, emp_name TEXT, doc_type TEXT, doc_number TEXT, expiry_date TEXT, notes TEXT)")
 
     conn.commit()
 
@@ -285,6 +286,60 @@ def delete_advance(adv_id):
         conn.close()
         flash('🗑️ تم حذف السجل بنجاح')
     return redirect('/advances')
+@app.route('/documents')
+def documents_page():
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    today_dt = get_ksa_time().date()
+    conn, is_pg = get_db()
+    employees = run_query(conn, is_pg, "SELECT emp_id, name FROM employees WHERE emp_id != 'admin' ORDER BY name ASC", fetch='all')
+    raw_docs = run_query(conn, is_pg, "SELECT id, emp_id, emp_name, doc_type, doc_number, expiry_date, COALESCE(notes, '') FROM emp_documents ORDER BY expiry_date ASC", fetch='all')
+    conn.close()
+    
+    docs = []
+    for d in raw_docs:
+        try:
+            exp_dt = datetime.strptime(d[5], '%Y-%m-%d').date()
+            days_left = (exp_dt - today_dt).days
+        except Exception:
+            days_left = 999
+        if days_left < 0:
+            status_label, badge_color = f"🔴 منتهية منذ {abs(days_left)} يوم", "#fee2e2; color:#b91c1c"
+        elif days_left <= 30:
+            status_label, badge_color = f"🟡 متبقي {days_left} يوم", "#fef3c7; color:#b45309"
+        else:
+            status_label, badge_color = f"🟢 سارية ({days_left} يوم)", "#dcfce7; color:#15803d"
+        docs.append({'id': d[0], 'emp_id': d[1], 'emp_name': d[2], 'doc_type': d[3], 'doc_number': d[4], 'expiry_date': d[5], 'notes': d[6], 'status': status_label, 'style': badge_color})
+    return render_template('documents.html', page='documents', employees=employees, docs=docs)
+
+@app.route('/add_document', methods=['POST'])
+def add_document():
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    emp_id = request.form['emp_id']
+    doc_type = request.form['doc_type']
+    doc_number = request.form['doc_number'].strip()
+    expiry_date = request.form['expiry_date']
+    notes = request.form.get('notes', '').strip()
+    conn, is_pg = get_db()
+    emp_row = run_query(conn, is_pg, "SELECT name FROM employees WHERE emp_id = ?", (emp_id,), fetch='one')
+    emp_name = emp_row[0] if emp_row else emp_id
+    run_query(conn, is_pg, "INSERT INTO emp_documents (emp_id, emp_name, doc_type, doc_number, expiry_date, notes) VALUES (?, ?, ?, ?, ?, ?)",
+              (emp_id, emp_name, doc_type, doc_number, expiry_date, notes))
+    conn.commit()
+    conn.close()
+    flash('✅ تم تسجيل الوثيقة وتفعيل متابعة تاريخ الانتهاء!')
+    return redirect('/documents')
+
+@app.route('/delete_document/<int:doc_id>')
+def delete_document(doc_id):
+    if session.get('role') == 'admin':
+        conn, is_pg = get_db()
+        run_query(conn, is_pg, "DELETE FROM emp_documents WHERE id = ?", (doc_id,))
+        conn.commit()
+        conn.close()
+        flash('🗑️ تم حذف الوثيقة')
+    return redirect('/documents')
 
 
 @app.route('/shifts')
