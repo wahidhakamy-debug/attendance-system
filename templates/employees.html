@@ -2,12 +2,12 @@
 {% block content %}
 
 <div class="card">
-    <h3 style="margin-top:0; color:#0284c7;">➕ إضافة موظف جديد</h3>
-    <form action="/add_employee" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end;">
+    <h3 style="margin-top:0; color:#0284c7;">➕ إضافة موظف أو مشرف فرع جديد</h3>
+    <form action="/add_employee" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; align-items: end;">
         <div><label>الرقم الوظيفي</label><input type="text" name="emp_id" placeholder="1005" required></div>
         <div><label>اسم الموظف</label><input type="text" name="name" placeholder="الاسم الكامل" required></div>
         <div><label>القسم</label><input type="text" name="department" placeholder="المبيعات" required></div>
-        <div><label>المسمى الوظيفي</label><input type="text" name="job_title" placeholder="محاسب" required></div>
+        <div><label>المسمى الوظيفي</label><input type="text" name="job_title" placeholder="مشرف مبيعات" required></div>
         <div>
             <label>الفرع المخصص</label>
             <select name="assigned_branch">
@@ -16,9 +16,16 @@
             </select>
         </div>
         <div>
-            <label>نظام الدوام (الوردية)</label>
+            <label>نظام الدوام</label>
             <select name="assigned_shift">
                 {% for s in shifts %}<option value="{{ s.1 }}">🕒 {{ s.1 }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>الصلاحية</label>
+            <select name="role">
+                <option value="employee">👤 موظف</option>
+                <option value="supervisor">🛡️ مشرف فرع</option>
             </select>
         </div>
         <div><label>الراتب الأساسي (ر.س)</label><input type="number" step="0.01" name="base_salary" value="3000" required></div>
@@ -28,37 +35,47 @@
 </div>
 
 <div class="card">
-    <h3 style="margin-top:0;">👥 قائمة الموظفين المسجلين (تعديل وحفظ)</h3>
+    <h3 style="margin-top:0;">👥 قائمة الموظفين والمشرفين المسجلين</h3>
     <div style="overflow-x:auto;">
         <table>
             <thead>
-                <tr><th>الرقم</th><th>الاسم</th><th>القسم</th><th>المسمى</th><th>الفرع المخصص</th><th>الوردية</th><th>الراتب الأساسي</th><th>كلمة مرور جديدة</th><th>إجراء</th></tr>
+                <tr><th>الرقم</th><th>الاسم</th><th>القسم</th><th>المسمى</th><th>الفرع</th><th>الوردية</th><th>الصلاحية</th><th>الراتب</th><th>كلمة مرور</th><th>إجراء</th></tr>
             </thead>
             <tbody>
                 {% for emp in employees %}
                 <tr>
                     <form action="/edit_employee/{{ emp.0 }}" method="POST">
                         <td><strong>{{ emp.0 }}</strong></td>
-                        <td><input type="text" name="name" value="{{ emp.1 }}" required style="padding:6px; font-size:14px;"></td>
-                        <td><input type="text" name="department" value="{{ emp.2 }}" required style="padding:6px; font-size:14px;"></td>
-                        <td><input type="text" name="job_title" value="{{ emp.3 }}" required style="padding:6px; font-size:14px;"></td>
+                        <td><input type="text" name="name" value="{{ emp.1 }}" required style="padding:6px; font-size:13px;"></td>
+                        <td><input type="text" name="department" value="{{ emp.2 }}" required style="padding:6px; font-size:13px;"></td>
+                        <td><input type="text" name="job_title" value="{{ emp.3 }}" required style="padding:6px; font-size:13px;"></td>
                         <td>
-                            <select name="assigned_branch" style="padding:6px; font-size:14px;">
+                            <select name="assigned_branch" style="padding:6px; font-size:13px;">
                                 <option value="جميع الفروع" {% if emp.4 == 'جميع الفروع' %}selected{% endif %}>🌐 جميع الفروع</option>
                                 {% for b in branches %}<option value="{{ b.1 }}" {% if emp.4 == b.1 %}selected{% endif %}>📍 {{ b.1 }}</option>{% endfor %}
                             </select>
                         </td>
                         <td>
-                            <select name="assigned_shift" style="padding:6px; font-size:14px;">
+                            <select name="assigned_shift" style="padding:6px; font-size:13px;">
                                 {% for s in shifts %}<option value="{{ s.1 }}" {% if emp.5 == s.1 %}selected{% endif %}>🕒 {{ s.1 }}</option>{% endfor %}
                             </select>
                         </td>
-                        <td><input type="number" step="0.01" name="base_salary" value="{{ emp.6 }}" required style="padding:6px; font-size:14px; width:90px;"></td>
-                        <td><input type="text" name="password" placeholder="اختياري" style="padding:6px; font-size:14px; width:85px;"></td>
+                        <td>
+                            {% if emp.0 == 'admin' %}
+                            <span style="background:#0f172a; color:white; padding:4px 8px; border-radius:6px; font-size:12px;">👑 مدير عام</span>
+                            {% else %}
+                            <select name="role" style="padding:6px; font-size:13px;">
+                                <option value="employee" {% if emp.7 == 'employee' %}selected{% endif %}>👤 موظف</option>
+                                <option value="supervisor" {% if emp.7 == 'supervisor' %}selected{% endif %}>🛡️ مشرف فرع</option>
+                            </select>
+                            {% endif %}
+                        </td>
+                        <td><input type="number" step="0.01" name="base_salary" value="{{ emp.6 }}" required style="padding:6px; font-size:13px; width:80px;"></td>
+                        <td><input type="text" name="password" placeholder="اختياري" style="padding:6px; font-size:13px; width:75px;"></td>
                         <td style="white-space: nowrap;">
-                            <button type="submit" class="btn" style="background:#16a34a; padding:7px 10px;">💾 حفظ</button>
+                            <button type="submit" class="btn" style="background:#16a34a; padding:6px 9px;">💾</button>
                             {% if emp.0 != 'admin' %}
-                            <a href="/delete_emp/{{ emp.0 }}" onclick="return confirm('حذف هذا الموظف؟')" class="btn" style="background:#dc2626; padding:7px 10px; text-decoration:none;">حذف</a>
+                            <a href="/delete_emp/{{ emp.0 }}" onclick="return confirm('حذف هذا الموظف؟')" class="btn" style="background:#dc2626; padding:6px 9px; text-decoration:none;">🗑️</a>
                             {% endif %}
                         </td>
                     </form>
