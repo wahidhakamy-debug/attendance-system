@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card" style="max-width: 750px; margin: 0 auto;">
+    <div class="print-header">
+        <div><h2 style="margin:0;">شركة منبع الجنوب للتجارة</h2><p style="margin:5px 0 0;">قسيمة راتب موظف شهر ({{ month }})</p></div>
+        <div>نظام الموارد البشرية</div>
+    </div>
+
+    <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px; border-bottom:1px solid #e2e8f0; padding-bottom:15px;">
+        <h3 style="margin:0; color:#0284c7;">🧾 كشف الراتب التفصيلي</h3>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <form method="GET" action="/my_payslip" style="display:flex; gap:8px; align-items:center;">
+                <input type="month" name="month" value="{{ month }}" style="width:auto; padding:8px;">
+                <button type="submit" class="btn btn-primary" style="padding:9px 15px;">عرض</button>
+            </form>
+            <button onclick="window.print()" class="btn" style="background:#334155; padding:9px 15px;">🖨️ طباعة</button>
+        </div>
+    </div>
+
+    <div style="background:#f8fafc; padding:15px; border-radius:10px; margin-bottom:20px; display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px; font-size:15px;">
+        <div><strong>اسم الموظف:</strong> {{ slip.name }}</div>
+        <div><strong>الرقم الوظيفي:</strong> {{ slip.emp_id }}</div>
+        <div><strong>القسم:</strong> {{ slip.department }}</div>
+        <div><strong>المسمى:</strong> {{ slip.job_title }}</div>
+        <div><strong>الفرع:</strong> {{ slip.branch }}</div>
+        <div><strong>الوردية:</strong> {{ slip.shift }}</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr><th>البند</th><th>التفاصيل / المدة</th><th>المبلغ (ر.س)</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>الراتب الأساسي الشهري</strong></td>
+                <td>أيام الحضور المسجلة: <strong>{{ slip.days }} يوم</strong></td>
+                <td style="font-weight:bold;">{{ "%.2f"|format(slip.base_salary) }} ر.س</td>
+            </tr>
+            <tr>
+                <td style="color:#16a34a;"><strong>+ مكافأة العمل الإضافي</strong></td>
+                <td>إجمالي الإضافي: {{ slip.ot_txt }} (1.5x)</td>
+                <td style="color:#16a34a; font-weight:bold;">+ {{ "%.2f"|format(slip.ot_bonus) }} ر.س</td>
+            </tr>
+            <tr>
+                <td style="color:#dc2626;"><strong>- خصم التأخير</strong></td>
+                <td>إجمالي التأخير: {{ slip.late_txt }}</td>
+                <td style="color:#dc2626; font-weight:bold;">- {{ "%.2f"|format(slip.late_deduct) }} ر.س</td>
+            </tr>
+            <tr>
+                <td style="color:#dc2626;"><strong>- استقطاع السُلف والعُهد المعتمدة</strong></td>
+                <td>مستقطع لشهر {{ month }}</td>
+                <td style="color:#dc2626; font-weight:bold;">- {{ "%.2f"|format(slip.adv_deduct) }} ر.س</td>
+            </tr>
+            <tr style="background:#f0fdf4; font-size:18px;">
+                <td colspan="2"><strong>صافي الراتب المستحق للصرف</strong></td>
+                <td style="color:#15803d; font-weight:bold;">{{ "%.2f"|format(slip.net_salary) }} ر.س</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="print-footer"><div>توقيع الموظف: ....................</div><div>اعتماد الموارد البشرية: ....................</div></div>
+</div>
+
+{% endblock %}
