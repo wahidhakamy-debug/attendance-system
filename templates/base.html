@@ -40,11 +40,13 @@
         <div class="nav-links">
             <a href="/dashboard" class="{% if page == 'dashboard' %}active{% endif %}">🏠 الرئيسية والسجل</a>
             <a href="/leaves" class="{% if page == 'leaves' %}active{% endif %}">📩 الإجازات والاستئذان</a>
-                        {% if session['role'] == 'admin' %}
+                                    {% if session['role'] == 'admin' %}
+            <a href="/payroll" class="{% if page == 'payroll' %}active{% endif %}">💰 الرواتب</a>
             <a href="/employees" class="{% if page == 'employees' %}active{% endif %}">👥 الموظفون</a>
             <a href="/shifts" class="{% if page == 'shifts' %}active{% endif %}">🕒 الورديات</a>
             <a href="/branches" class="{% if page == 'branches' %}active{% endif %}">📍 الفروع (GPS)</a>
             {% endif %}
+
 
         </div>
         <div class="nav-user">
