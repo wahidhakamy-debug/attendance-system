@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <div class="print-header">
+        <div><h2 style="margin:0;">شركة منبع الجنوب للتجارة</h2><p style="margin:5px 0 0;">مسير الرواتب والاستحقاقات الشهرية ({{ month }})</p></div>
+        <div>نظام الموارد البشرية</div>
+    </div>
+
+    <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:15px;">
+        <h3 style="margin:0; color:#15803d;">💰 مسير الرواتب والاستحقاقات الشهرية</h3>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <form method="GET" action="/payroll" style="display:flex; gap:8px; align-items:center;">
+                <label style="margin:0;">اختر الشهر:</label>
+                <input type="month" name="month" value="{{ month }}" style="width:auto; padding:8px;">
+                <button type="submit" class="btn btn-primary" style="padding:9px 16px;">عرض</button>
+            </form>
+            <button onclick="window.print()" class="btn" style="background:#334155; padding:9px 16px;">🖨️ طباعة المسير</button>
+        </div>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>الرقم</th>
+                    <th>اسم الموظف</th>
+                    <th>القسم</th>
+                    <th>الراتب الأساسي</th>
+                    <th>أيام الحضور</th>
+                    <th>إجمالي التأخير</th>
+                    <th>خصم التأخير</th>
+                    <th>العمل الإضافي</th>
+                    <th>مكافأة الإضافي (1.5x)</th>
+                    <th>صافي الراتب المستحق</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payroll_data %}
+                <tr>
+                    <td><strong>{{ p.emp_id }}</strong></td>
+                    <td><strong>{{ p.name }}</strong></td>
+                    <td>{{ p.department }}</td>
+                    <td>{{ "%.2f"|format(p.base_salary) }} ر.س</td>
+                    <td><span style="background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:6px; font-weight:bold;">{{ p.days }} يوم</span></td>
+                    <td>{{ p.late_txt }}</td>
+                    <td style="color:#dc2626; font-weight:bold;">- {{ "%.2f"|format(p.late_deduct) }} ر.س</td>
+                    <td>{{ p.ot_txt }}</td>
+                    <td style="color:#16a34a; font-weight:bold;">+ {{ "%.2f"|format(p.ot_bonus) }} ر.س</td>
+                    <td><span style="background:#dcfce7; color:#15803d; padding:6px 12px; border-radius:8px; font-weight:bold; font-size:16px;">{{ "%.2f"|format(p.net_salary) }} ر.س</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="10" style="text-align:center; color:#64748b;">لا يوجد موظفون مسجلون</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="print-footer"><div>إعداد: الموارد البشرية</div><div>اعتماد المدير العام: ....................</div><div>الختم الرسمي</div></div>
+</div>
+
+{% endblock %}
