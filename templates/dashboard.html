@@ -26,10 +26,10 @@
 
 <div class="card no-print" style="text-align: center;">
     <h3 style="margin-top:0;">⏰ تسجيل الحضور والانصراف المباشر (GPS)</h3>
-    <p style="color:#64748b; font-size:16px;">التاريخ: <strong>{{ now_date }}</strong> | الوقت الحالي: <strong id="clock">{{ now_time }}</strong></p>
+    <p style="color:#64748b; font-size:16px;">التاريخ: <strong>{{ now_date }}</strong> | الوقت الحالي: <strong id="clock">{{ now_time }}</strong> | الوردية: <span style="background:#e0f2fe; color:#0369a1; padding:3px 10px; border-radius:6px; font-weight:bold;">🕒 {{ shift_name }}</span></p>
     <div id="gps-status" style="margin-bottom:15px; font-weight:bold; color:#0284c7;">📡 جاري تحديد موقعك الجغرافي...</div>
     
-       <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+    <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
         {% if open_rec %}
         <form action="/action/out" method="POST">
             <input type="hidden" name="lat" class="lat-input"><input type="hidden" name="lon" class="lon-input">
@@ -46,8 +46,33 @@
         </div>
         {% endif %}
     </div>
-
 </div>
+
+{% if session['role'] == 'admin' %}
+<div class="card no-print">
+    <h3 style="margin-top:0; color:#0284c7;">➕ إضافة سجل حضور يدوي (للتصحيح أو الحالات الاستثنائية)</h3>
+    <form action="/add_manual_attendance" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: end;">
+        <div>
+            <label>الموظف</label>
+            <select name="emp_id" required>
+                {% for e in employees %}<option value="{{ e.0 }}">{{ e.1 }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>الفرع</label>
+            <select name="branch_name" required>
+                {% for b in branches %}<option value="{{ b.1 }}">{{ b.1 }}</option>{% endfor %}
+            </select>
+        </div>
+        <div><label>التاريخ</label><input type="date" name="date" value="{{ now_date }}" required></div>
+        <div><label>الحضور (HH:MM:SS)</label><input type="text" name="check_in" placeholder="08:00:00" required></div>
+        <div><label>الانصراف (اختياري)</label><input type="text" name="check_out" placeholder="16:00:00"></div>
+        <div><label>التأخير (دقائق)</label><input type="number" name="late_minutes" value="0"></div>
+        <div><label>الإضافي (دقائق)</label><input type="number" name="overtime_minutes" value="0"></div>
+        <div><button type="submit" class="btn btn-primary" style="padding:11px; width:100%;">➕ إضافة السجل</button></div>
+    </form>
+</div>
+{% endif %}
 
 <div class="card">
     <div class="print-header">
@@ -86,19 +111,36 @@
     <div style="overflow-x:auto;">
         <table>
             <thead>
-                <tr><th>الرقم</th><th>الاسم</th><th>القسم</th><th>الفرع</th><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th><th>التأخير</th><th>العمل الإضافي</th></tr>
+                <tr>
+                    <th>الرقم</th><th>الاسم</th><th>القسم</th><th>الفرع</th><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th><th>التأخير</th><th>العمل الإضافي</th>
+                    {% if session['role'] == 'admin' %}<th class="no-print">إدارة السجل</th>{% endif %}
+                </tr>
             </thead>
             <tbody>
                 {% for r in records %}
                 <tr>
-                    <td><strong>{{ r.0 }}</strong></td><td><strong>{{ r.1 }}</strong></td><td>{{ r.2 }}</td>
-                    <td><span style="background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:6px; font-weight:bold;">📍 {{ r.3 }}</span></td>
-                    <td>{{ r.4 }}</td>
-                    <td><span class="badge-in">{{ r.5 or '--:--' }}</span></td>
-                    <td><span class="badge-out">{{ r.6 or '--:--' }}</span></td>
-                    <td><strong>{{ r.7 or 'قيد العمل...' }}</strong></td>
-                    <td>{% if r.8 > 0 %}<span style="background:#fee2e2; color:#b91c1c; padding:4px 10px; border-radius:12px; font-weight:bold;">⚠️ {{ r.9 }}</span>{% else %}<span style="color:#16a34a; font-weight:bold;">منضبط</span>{% endif %}</td>
-                    <td>{% if r.10 > 0 %}<span style="background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:12px; font-weight:bold;">⭐ {{ r.11 }}</span>{% else %}<span style="color:#64748b;">--</span>{% endif %}</td>
+                    <td><strong>{{ r.1 }}</strong></td><td><strong>{{ r.2 }}</strong></td><td>{{ r.3 }}</td>
+                    <td><span style="background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:6px; font-weight:bold;">📍 {{ r.4 }}</span></td>
+                    <td>{{ r.5 }}</td>
+                    {% if session['role'] == 'admin' %}
+                    <form action="/edit_attendance/{{ r.0 }}" method="POST">
+                        <td><input type="text" name="check_in" value="{{ r.6 or '' }}" style="padding:4px; width:80px; font-size:13px;"></td>
+                        <td><input type="text" name="check_out" value="{{ r.7 or '' }}" placeholder="--:--" style="padding:4px; width:80px; font-size:13px;"></td>
+                        <td><strong>{{ r.8 or 'قيد العمل...' }}</strong></td>
+                        <td><input type="number" name="late_minutes" value="{{ r.9 }}" style="padding:4px; width:55px; font-size:13px;"> د</td>
+                        <td><input type="number" name="overtime_minutes" value="{{ r.11 }}" style="padding:4px; width:55px; font-size:13px;"> د</td>
+                        <td class="no-print" style="white-space: nowrap;">
+                            <button type="submit" class="btn" style="background:#16a34a; padding:5px 8px; font-size:13px;">💾</button>
+                            <a href="/delete_attendance/{{ r.0 }}" onclick="return confirm('حذف هذا السجل نهائياً؟')" class="btn" style="background:#dc2626; padding:5px 8px; font-size:13px; text-decoration:none;">🗑️</a>
+                        </td>
+                    </form>
+                    {% else %}
+                    <td><span class="badge-in">{{ r.6 or '--:--' }}</span></td>
+                    <td><span class="badge-out">{{ r.7 or '--:--' }}</span></td>
+                    <td><strong>{{ r.8 or 'قيد العمل...' }}</strong></td>
+                    <td>{% if r.9 > 0 %}<span style="background:#fee2e2; color:#b91c1c; padding:4px 10px; border-radius:12px; font-weight:bold;">⚠️ {{ r.10 }}</span>{% else %}<span style="color:#16a34a; font-weight:bold;">منضبط</span>{% endif %}</td>
+                    <td>{% if r.11 > 0 %}<span style="background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:12px; font-weight:bold;">⭐ {{ r.12 }}</span>{% else %}<span style="color:#64748b;">--</span>{% endif %}</td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
@@ -111,16 +153,3 @@
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             pos => {
-                document.querySelectorAll('.lat-input').forEach(el => el.value = pos.coords.latitude);
-                document.querySelectorAll('.lon-input').forEach(el => el.value = pos.coords.longitude);
-                document.getElementById('gps-status').innerHTML = '✅ تم تحديد موقعك بنجاح وجاهز للتحضير';
-                document.getElementById('gps-status').style.color = '#16a34a';
-            },
-            err => {
-                document.getElementById('gps-status').innerHTML = '⚠️ يرجى تفعيل الموقع الجغرافي (GPS) في المتصفح';
-                document.getElementById('gps-status').style.color = '#dc2626';
-            }, { enableHighAccuracy: true }
-        );
-    }
-</script>
-{% endblock %}
