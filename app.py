@@ -61,6 +61,8 @@ def init_db():
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS branches (id {pk}, name TEXT, lat REAL, lon REAL, radius INTEGER, start_time TEXT DEFAULT '08:00', end_time TEXT DEFAULT '16:00', grace_period INTEGER DEFAULT 15)")
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS attendance (id {pk}, emp_id TEXT, branch_name TEXT, date TEXT, check_in TEXT, check_out TEXT, work_hours TEXT, late_minutes INTEGER DEFAULT 0, overtime_minutes INTEGER DEFAULT 0, ip_address TEXT)')
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS leave_requests (id {pk}, emp_id TEXT, emp_name TEXT, req_type TEXT, req_date TEXT, duration_text TEXT, reason TEXT, status TEXT DEFAULT 'قيد المراجعة', created_at TEXT)")
+    run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS advances (id {pk}, emp_id TEXT, emp_name TEXT, adv_type TEXT, amount REAL, deduct_month TEXT, reason TEXT, status TEXT DEFAULT 'قيد المراجعة', created_at TEXT)")
+
     conn.commit()
 
     safe_alter(conn, is_pg, "ALTER TABLE employees ADD COLUMN assigned_shift TEXT DEFAULT 'الوردية الصباحية'")
