@@ -144,7 +144,7 @@ def dashboard():
     shift_info = run_query(conn, is_pg, "SELECT shift_type, start1, end1, start2, end2 FROM shifts WHERE name = ?", (shift_name,), fetch='one')
     shift_type = shift_info[0] if shift_info else 'single'
 
-        open_rec = run_query(conn, is_pg, "SELECT id, branch_name, date, check_in FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NULL ORDER BY id DESC LIMIT 1", (session['emp_id'], today), fetch='one')
+    open_rec = run_query(conn, is_pg, "SELECT id, branch_name, date, check_in FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NULL ORDER BY id DESC LIMIT 1", (session['emp_id'], today), fetch='one')
     today_done_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NOT NULL", (session['emp_id'], today), fetch='one')[0]
     max_sessions = 2 if shift_type == 'split' else 1
 
