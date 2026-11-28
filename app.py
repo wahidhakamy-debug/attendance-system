@@ -153,12 +153,15 @@ def dashboard():
     today_done_count = int(done_row[0]) if done_row else 0
     max_sessions = 2 if shift_type == 'split' else 1
 
-    query = "SELECT a.id, a.emp_id, e.name, e.department, a.branch_name, a.date, a.check_in, a.check_out, a.work_hours, COALESCE(a.late_minutes, 0), COALESCE(a.overtime_minutes, 0) FROM attendance a JOIN employees e ON a.emp_id = e.emp_id WHERE 1=1"
+        query = "SELECT a.id, a.emp_id, e.name, e.department, a.branch_name, a.date, a.check_in, a.check_out, a.work_hours, COALESCE(a.late_minutes, 0), COALESCE(a.overtime_minutes, 0) FROM attendance a JOIN employees e ON a.emp_id = e.emp_id WHERE 1=1"
     params = []
-    if session['role'] != 'admin':
+    if session['role'] == 'employee':
         query += " AND a.emp_id = ?"
         params.append(session['emp_id'])
-    elif emp_filter:
+    elif session['role'] == 'supervisor' and session.get('assigned_branch') != 'جميع الفروع':
+        query += " AND e.assigned_branch = ?"
+        params.append(session['assigned_branch'])
+    if emp_filter:
         query += " AND a.emp_id = ?"
         params.append(emp_filter)
     if start_date:
@@ -172,13 +175,18 @@ def dashboard():
     records = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], format_mins(r[9]), r[10], format_mins(r[10])) for r in raw_records]
     
     stats, employees, branches = {}, [], []
-    if session['role'] == 'admin':
-        employees = run_query(conn, is_pg, "SELECT emp_id, name FROM employees", fetch='all')
-        branches = run_query(conn, is_pg, "SELECT id, name FROM branches", fetch='all')
+    if session['role'] in ('admin', 'supervisor'):
+        if session['role'] == 'supervisor' and session.get('assigned_branch') != 'جميع الفروع':
+            employees = run_query(conn, is_pg, "SELECT emp_id, name FROM employees WHERE assigned_branch = ?", (session['assigned_branch'],), fetch='all')
+            branches = run_query(conn, is_pg, "SELECT id, name FROM branches WHERE name = ?", (session['assigned_branch'],), fetch='all')
+        else:
+            employees = run_query(conn, is_pg, "SELECT emp_id, name FROM employees", fetch='all')
+            branches = run_query(conn, is_pg, "SELECT id, name FROM branches", fetch='all')
         present = run_query(conn, is_pg, "SELECT COUNT(DISTINCT emp_id) FROM attendance WHERE date = ?", (today,), fetch='one')
         active = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE check_out IS NULL", fetch='one')
         pending_leaves = run_query(conn, is_pg, "SELECT COUNT(*) FROM leave_requests WHERE status = 'قيد المراجعة'", fetch='one')
         stats = {'total_emp': len(employees), 'present_today': present[0] if present else 0, 'active_now': active[0] if active else 0, 'pending_leaves': pending_leaves[0] if pending_leaves else 0}
+
     conn.close()
     return render_template('dashboard.html', page='dashboard', now_time=now.strftime('%H:%M:%S'), now_date=today, open_rec=open_rec, today_done_count=today_done_count, max_sessions=max_sessions, shift_name=shift_name, records=records, stats=stats, employees=employees, branches=branches, emp_filter=emp_filter, start_date=start_date, end_date=end_date)
 @app.route('/payroll')
@@ -341,6 +349,39 @@ def delete_document(doc_id):
         conn.close()
         flash('🗑️ تم حذف الوثيقة')
     return redirect('/documents')
+@app.route('/evaluations')
+def evaluations_page():
+    if session.get('role') not in ('admin', 'supervisor'):
+        return redirect('/dashboard')
+    month = request.args.get('month', get_ksa_time().strftime('%Y-%m'))
+    conn, is_pg = get_db()
+    if session['role'] == 'supervisor' and session.get('assigned_branch') != 'جميع الفروع':
+        employees = run_query(conn, is_pg, "SELECT emp_id, name, department FROM employees WHERE emp_id != 'admin' AND assigned_branch = ? ORDER BY name ASC", (session['assigned_branch'],), fetch='all')
+    else:
+        employees = run_query(conn, is_pg, "SELECT emp_id, name, department FROM employees WHERE emp_id != 'admin' ORDER BY name ASC", fetch='all')
+    evals = run_query(conn, is_pg, "SELECT id, emp_id, emp_name, eval_month, score, bonus, COALESCE(notes, '') FROM evaluations WHERE eval_month = ? ORDER BY id DESC", (month,), fetch='all')
+    conn.close()
+    return render_template('evaluations.html', page='evaluations', month=month, employees=employees, evals=evals)
+
+@app.route('/save_evaluation', methods=['POST'])
+def save_evaluation():
+    if session.get('role') not in ('admin', 'supervisor'):
+        return redirect('/dashboard')
+    emp_id = request.form['emp_id']
+    eval_month = request.form['eval_month']
+    score = int(request.form['score'])
+    bonus = float(request.form.get('bonus') or 0)
+    notes = request.form.get('notes', '').strip()
+    conn, is_pg = get_db()
+    emp_row = run_query(conn, is_pg, "SELECT name FROM employees WHERE emp_id = ?", (emp_id,), fetch='one')
+    emp_name = emp_row[0] if emp_row else emp_id
+    run_query(conn, is_pg, "DELETE FROM evaluations WHERE emp_id = ? AND eval_month = ?", (emp_id, eval_month))
+    run_query(conn, is_pg, "INSERT INTO evaluations (emp_id, emp_name, eval_month, score, bonus, notes) VALUES (?, ?, ?, ?, ?, ?)",
+              (emp_id, emp_name, eval_month, score, bonus, notes))
+    conn.commit()
+    conn.close()
+    flash(f'✅ تم حفظ تقييم ومكافأة ({emp_name}) لشهر {eval_month} بنجاح!')
+    return redirect(f'/evaluations?month={eval_month}')
 
 
 @app.route('/shifts')
@@ -644,8 +685,9 @@ def add_employee():
         return redirect('/dashboard')
     conn, is_pg = get_db()
     try:
-        run_query(conn, is_pg, "INSERT INTO employees (emp_id, name, department, job_title, assigned_branch, assigned_shift, base_salary, password, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'employee')",
-                  (request.form['emp_id'].strip(), request.form['name'].strip(), request.form['department'].strip(), request.form['job_title'].strip(), request.form['assigned_branch'], request.form['assigned_shift'], float(request.form.get('base_salary') or 3000), generate_password_hash(request.form['password'].strip())))
+        role = request.form.get('role', 'employee')
+        run_query(conn, is_pg, "INSERT INTO employees (emp_id, name, department, job_title, assigned_branch, assigned_shift, base_salary, password, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (request.form['emp_id'].strip(), request.form['name'].strip(), request.form['department'].strip(), request.form['job_title'].strip(), request.form['assigned_branch'], request.form['assigned_shift'], float(request.form.get('base_salary') or 3000), generate_password_hash(request.form['password'].strip()), role))
         conn.commit()
         flash('✅ تم إضافة الموظف وربطه بالفرع والوردية والراتب بنجاح!')
     except Exception:
@@ -662,17 +704,19 @@ def edit_employee(emp_id):
     name, dept, title = request.form['name'].strip(), request.form['department'].strip(), request.form['job_title'].strip()
     branch, shift = request.form['assigned_branch'], request.form['assigned_shift']
     salary = float(request.form.get('base_salary') or 0)
+    role = 'admin' if emp_id == 'admin' else request.form.get('role', 'employee')
     new_pass = request.form.get('password', '').strip()
     if new_pass:
-        run_query(conn, is_pg, "UPDATE employees SET name=?, department=?, job_title=?, assigned_branch=?, assigned_shift=?, base_salary=?, password=? WHERE emp_id=?",
-                  (name, dept, title, branch, shift, salary, generate_password_hash(new_pass), emp_id))
+        run_query(conn, is_pg, "UPDATE employees SET name=?, department=?, job_title=?, assigned_branch=?, assigned_shift=?, base_salary=?, role=?, password=? WHERE emp_id=?",
+                  (name, dept, title, branch, shift, salary, role, generate_password_hash(new_pass), emp_id))
     else:
-        run_query(conn, is_pg, "UPDATE employees SET name=?, department=?, job_title=?, assigned_branch=?, assigned_shift=?, base_salary=? WHERE emp_id=?",
-                  (name, dept, title, branch, shift, salary, emp_id))
+        run_query(conn, is_pg, "UPDATE employees SET name=?, department=?, job_title=?, assigned_branch=?, assigned_shift=?, base_salary=?, role=? WHERE emp_id=?",
+                  (name, dept, title, branch, shift, salary, role, emp_id))
     conn.commit()
     conn.close()
     flash('✅ تم حفظ تعديلات الموظف بنجاح!')
     return redirect('/employees')
+
 
 @app.route('/delete_emp/<emp_id>')
 def delete_emp(emp_id):
