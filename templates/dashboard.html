@@ -142,7 +142,7 @@
                     <td>{% if r.11 > 0 %}<span style="background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:12px; font-weight:bold;">⭐ {{ r.12 }}</span>{% else %}<span style="color:#64748b;">--</span>{% endif %}</td>
                     {% endif %}
                 </tr>
-                {% endfor %}
+                               {% endfor %}
             </tbody>
         </table>
     </div>
@@ -153,3 +153,16 @@
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             pos => {
+                document.querySelectorAll('.lat-input').forEach(el => el.value = pos.coords.latitude);
+                document.querySelectorAll('.lon-input').forEach(el => el.value = pos.coords.longitude);
+                document.getElementById('gps-status').innerHTML = '✅ تم تحديد موقعك بنجاح وجاهز للتحضير';
+                document.getElementById('gps-status').style.color = '#16a34a';
+            },
+            err => {
+                document.getElementById('gps-status').innerHTML = '⚠️ يرجى تفعيل الموقع الجغرافي (GPS) في المتصفح';
+                document.getElementById('gps-status').style.color = '#dc2626';
+            }, { enableHighAccuracy: true }
+        );
+    }
+</script>
+{% endblock %}
