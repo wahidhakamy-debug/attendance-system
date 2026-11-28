@@ -150,20 +150,48 @@ def dashboard():
     raw_records = run_query(conn, is_pg, query, tuple(params), fetch='all')
     records = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], format_mins(r[8]), r[9], format_mins(r[9])) for r in raw_records]
     
+    stats, employees, pending_leaves = {}, [], 0
+    if session['role'] == 'admin':
+        employees = run_query(conn, is_pg, "SELECT emp_id, name FROM employees", fetch='all')
+        present = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE date = ?", (today,), fetch='one')[0]
+        active = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE date = ? AND check_out IS NULL", (today,), fetch='one')[0]
+        pending_leaves = run_query(conn, is_pg, "SELECT COUNT(*) FROM leave_requests WHERE status = 'قيد المراجعة'", fetch='one')[0]
+        stats = {'total_emp': len(employees), 'present_today': present, 'active_now': active, 'pending_leaves': pending_leaves}
+    conn.close()
+    return render_template('dashboard.html', page='dashboard', now_time=now.strftime('%H:%M:%S'), now_date=today, today_rec=today_rec, records=records, stats=stats, employees=employees, emp_filter=emp_filter, start_date=start_date, end_date=end_date)
+
+@app.route('/leaves')
+def leaves_page():
+    if 'emp_id' not in session:
+        return redirect('/')
+    now = get_ksa_time()
+    today = now.strftime('%Y-%m-%d')
+    conn, is_pg = get_db()
     if session['role'] == 'admin':
         leaves = run_query(conn, is_pg, "SELECT id, emp_id, emp_name, req_type, req_date, duration_text, reason, status FROM leave_requests ORDER BY id DESC", fetch='all')
     else:
         leaves = run_query(conn, is_pg, "SELECT id, emp_id, emp_name, req_type, req_date, duration_text, reason, status FROM leave_requests WHERE emp_id = ? ORDER BY id DESC", (session['emp_id'],), fetch='all')
-
-    stats, employees, branches = {}, [], []
-    if session['role'] == 'admin':
-        employees = run_query(conn, is_pg, "SELECT emp_id, name, department, job_title, assigned_branch, role FROM employees", fetch='all')
-        branches = run_query(conn, is_pg, "SELECT id, name, lat, lon, radius, COALESCE(start_time, '08:00'), COALESCE(end_time, '16:00'), COALESCE(grace_period, 15) FROM branches", fetch='all')
-        present = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE date = ?", (today,), fetch='one')[0]
-        active = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE date = ? AND check_out IS NULL", (today,), fetch='one')[0]
-        stats = {'total_emp': len(employees), 'present_today': present, 'active_now': active}
     conn.close()
-    return render_template('dashboard.html', now_time=now.strftime('%H:%M:%S'), now_date=today, today_rec=today_rec, records=records, leaves=leaves, stats=stats, employees=employees, branches=branches, emp_filter=emp_filter, start_date=start_date, end_date=end_date)
+    return render_template('leaves.html', page='leaves', now_date=today, leaves=leaves)
+
+@app.route('/employees')
+def employees_page():
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    conn, is_pg = get_db()
+    employees = run_query(conn, is_pg, "SELECT emp_id, name, department, job_title, assigned_branch, role FROM employees ORDER BY id ASC", fetch='all')
+    branches = run_query(conn, is_pg, "SELECT id, name FROM branches", fetch='all')
+    conn.close()
+    return render_template('employees.html', page='employees', employees=employees, branches=branches)
+
+@app.route('/branches')
+def branches_page():
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    conn, is_pg = get_db()
+    branches = run_query(conn, is_pg, "SELECT id, name, lat, lon, radius, COALESCE(start_time, '08:00'), COALESCE(end_time, '16:00'), COALESCE(grace_period, 15) FROM branches ORDER BY id ASC", fetch='all')
+    conn.close()
+    return render_template('branches.html', page='branches', branches=branches)
 
 @app.route('/action/<type>', methods=['POST'])
 def action(type):
@@ -177,7 +205,7 @@ def action(type):
         
     conn, is_pg = get_db()
     emp_data = run_query(conn, is_pg, "SELECT assigned_branch FROM employees WHERE emp_id = ?", (session['emp_id'],), fetch='one')
-    assigned = emp_data[0] if emp_data else 'جميع الفروع'
+    assigned = emp_data if emp_data else 'جميع الفروع'
     
     if assigned == 'جميع الفروع':
         branches = run_query(conn, is_pg, "SELECT id, name, lat, lon, radius, COALESCE(start_time, '08:00'), COALESCE(end_time, '16:00'), COALESCE(grace_period, 15) FROM branches", fetch='all')
@@ -192,10 +220,10 @@ def action(type):
     matched_branch = None
     min_distance = float('inf')
     for b in branches:
-        dist = calculate_distance(b[2], b[3], float(lat), float(lon))
+        dist = calculate_distance(b, b, float(lat), float(lon))
         if dist < min_distance:
             min_distance = dist
-        if dist <= b[4]:
+        if dist <= b:
             matched_branch = b
             break
             
@@ -209,7 +237,7 @@ def action(type):
     rec = run_query(conn, is_pg, "SELECT id, check_in, check_out, branch_name FROM attendance WHERE emp_id = ? AND date = ?", (session['emp_id'], today), fetch='one')
     
     if type == 'in' and not rec:
-        b_name, b_start, b_grace = matched_branch[1], matched_branch[5], int(matched_branch[7])
+        b_name, b_start, b_grace = matched_branch, matched_branch, int(matched_branch)
         in_dt = datetime.strptime(t_str, '%H:%M:%S')
         start_dt = datetime.strptime(b_start, '%H:%M')
         allowed_dt = start_dt + timedelta(minutes=b_grace)
@@ -221,21 +249,21 @@ def action(type):
         flash(f'✅ تم تسجيل حضورك في ({b_name}) الساعة {t_str} | {late_txt}')
         send_telegram(f"🟢 تسجيل حضور\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {b_name}\nالوقت: {t_str}\nالحالة: {late_txt}")
         
-    elif type == 'out' and rec and not rec[2]:
-        dur = calculate_duration(rec[1], t_str)
-        b_info = run_query(conn, is_pg, "SELECT COALESCE(start_time, '08:00'), COALESCE(end_time, '16:00') FROM branches WHERE name = ?", (rec[3],), fetch='one')
-        b_start = b_info[0] if b_info else matched_branch[5]
-        b_end = b_info[1] if b_info else matched_branch[6]
+    elif type == 'out' and rec and not rec:
+        dur = calculate_duration(rec, t_str)
+        b_info = run_query(conn, is_pg, "SELECT COALESCE(start_time, '08:00'), COALESCE(end_time, '16:00') FROM branches WHERE name = ?", (rec,), fetch='one')
+        b_start = b_info if b_info else matched_branch
+        b_end = b_info if b_info else matched_branch
         
-        worked_mins = max(0, int((datetime.strptime(t_str, '%H:%M:%S') - datetime.strptime(rec[1], '%H:%M:%S')).total_seconds() // 60))
+        worked_mins = max(0, int((datetime.strptime(t_str, '%H:%M:%S') - datetime.strptime(rec, '%H:%M:%S')).total_seconds() // 60))
         required_mins = max(0, int((datetime.strptime(b_end, '%H:%M') - datetime.strptime(b_start, '%H:%M')).total_seconds() // 60))
         ot_mins = max(0, worked_mins - required_mins) if worked_mins > required_mins else 0
         
         run_query(conn, is_pg, "UPDATE attendance SET check_out = ?, work_hours = ?, overtime_minutes = ? WHERE id = ?",
-                  (t_str, dur, ot_mins, rec[0]))
+                  (t_str, dur, ot_mins, rec))
         ot_txt = f" | ⭐ إضافي: {format_mins(ot_mins)}" if ot_mins > 0 else ""
-        flash(f'🚪 تم تسجيل انصرافك من ({rec[3]}) الساعة {t_str} | ساعات العمل: {dur}{ot_txt}')
-        send_telegram(f"🔴 تسجيل انصراف\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {rec[3]}\nالوقت: {t_str}\nساعات العمل: {dur}{ot_txt}")
+        flash(f'🚪 تم تسجيل انصرافك من ({rec}) الساعة {t_str} | ساعات العمل: {dur}{ot_txt}')
+        send_telegram(f"🔴 تسجيل انصراف\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {rec}\nالوقت: {t_str}\nساعات العمل: {dur}{ot_txt}")
         
     conn.commit()
     conn.close()
@@ -259,7 +287,7 @@ def submit_leave():
     
     flash('✅ تم إرسال طلبك للإدارة بنجاح!')
     send_telegram(f"📩 طلب جديد ({req_type})\nالموظف: {session['name']} ({session['emp_id']})\nالتاريخ: {req_date}\nالمدة: {duration_text}\nالسبب: {reason}")
-    return redirect('/dashboard')
+    return redirect('/leaves')
 
 @app.route('/handle_leave/<int:req_id>/<decision>')
 def handle_leave(req_id, decision):
@@ -271,7 +299,7 @@ def handle_leave(req_id, decision):
     conn.commit()
     conn.close()
     flash(f'تم تحديث حالة الطلب إلى: {status}')
-    return redirect('/dashboard')
+    return redirect('/leaves')
 
 @app.route('/delete_leave/<int:req_id>')
 def delete_leave(req_id):
@@ -281,8 +309,7 @@ def delete_leave(req_id):
         conn.commit()
         conn.close()
         flash('🗑️ تم حذف الطلب بنجاح')
-    return redirect('/dashboard')
-
+    return redirect('/leaves')
 
 @app.route('/add_branch', methods=['POST'])
 def add_branch():
@@ -295,7 +322,7 @@ def add_branch():
     conn.commit()
     conn.close()
     flash('✅ تم إضافة الفرع ومواعيد دوامه بنجاح!')
-    return redirect('/dashboard')
+    return redirect('/branches')
 
 @app.route('/edit_branch/<int:b_id>', methods=['POST'])
 def edit_branch(b_id):
@@ -308,7 +335,7 @@ def edit_branch(b_id):
     conn.commit()
     conn.close()
     flash('✅ تم حفظ تعديلات الفرع ومواعيد الدوام بنجاح!')
-    return redirect('/dashboard')
+    return redirect('/branches')
 
 @app.route('/delete_branch/<int:b_id>')
 def delete_branch(b_id):
@@ -318,7 +345,7 @@ def delete_branch(b_id):
         conn.commit()
         conn.close()
         flash('تم حذف الفرع')
-    return redirect('/dashboard')
+    return redirect('/branches')
 
 @app.route('/add_employee', methods=['POST'])
 def add_employee():
@@ -334,7 +361,7 @@ def add_employee():
         conn.rollback()
         flash('❌ خطأ: الرقم الوظيفي مسجل مسبقاً!')
     conn.close()
-    return redirect('/dashboard')
+    return redirect('/employees')
 
 @app.route('/edit_employee/<emp_id>', methods=['POST'])
 def edit_employee(emp_id):
@@ -352,7 +379,7 @@ def edit_employee(emp_id):
     conn.commit()
     conn.close()
     flash('✅ تم حفظ تعديلات الموظف بنجاح!')
-    return redirect('/dashboard')
+    return redirect('/employees')
 
 @app.route('/delete_emp/<emp_id>')
 def delete_emp(emp_id):
@@ -362,7 +389,7 @@ def delete_emp(emp_id):
         conn.commit()
         conn.close()
         flash('تم حذف الموظف')
-    return redirect('/dashboard')
+    return redirect('/employees')
 
 @app.route('/export_csv')
 def export_csv():
@@ -385,7 +412,7 @@ def export_csv():
     raw_rows = run_query(conn, is_pg, query, tuple(params), fetch='all')
     conn.close()
     
-    formatted_rows = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], format_mins(r[8]), format_mins(r[9])) for r in raw_rows]
+    formatted_rows = [(r, r, r, r, r, r, r, r, format_mins(r), format_mins(r)) for r in raw_rows]
     out = io.StringIO()
     out.write('\ufeff')
     w = csv.writer(out, delimiter=';')
