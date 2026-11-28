@@ -4,12 +4,13 @@
 <div class="card">
     <h3 style="margin-top:0; color:#0284c7;">➕ إضافة نظام دوام (وردية جديدة)</h3>
     <form action="/add_shift" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end;">
-        <div><label>اسم الوردية</label><input type="text" name="name" placeholder="مثلاً: الوردية المسائية" required></div>
+        <div><label>اسم الوردية</label><input type="text" name="name" placeholder="مثلاً: الوردية المرنة (8 ساعات)" required></div>
         <div>
             <label>نظام الدوام</label>
             <select name="shift_type">
                 <option value="single">فترة واحدة متصلة</option>
                 <option value="split">فترتين (دوام متقطع)</option>
+                <option value="flexible">دوام مرن (بعدد الساعات)</option>
             </select>
         </div>
         <div><label>بداية الفترة 1</label><input type="time" name="start1" value="08:00" required></div>
@@ -37,6 +38,7 @@
                             <select name="shift_type" style="padding:6px; font-size:14px;">
                                 <option value="single" {% if s.2 == 'single' %}selected{% endif %}>متصل</option>
                                 <option value="split" {% if s.2 == 'split' %}selected{% endif %}>فترتين</option>
+                                <option value="flexible" {% if s.2 == 'flexible' %}selected{% endif %}>مرن</option>
                             </select>
                         </td>
                         <td><input type="time" name="start1" value="{{ s.3 }}" required style="padding:6px; font-size:14px;"></td>
