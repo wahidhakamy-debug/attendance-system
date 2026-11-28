@@ -144,14 +144,15 @@ def dashboard():
 
     conn, is_pg = get_db()
     emp_row = run_query(conn, is_pg, "SELECT COALESCE(assigned_shift, 'الوردية الصباحية') FROM employees WHERE emp_id = ?", (session['emp_id'],), fetch='one')
-    shift_name = emp_row if emp_row else 'الوردية الصباحية'
+    shift_name = emp_row[0] if emp_row else 'الوردية الصباحية'
     shift_info = run_query(conn, is_pg, "SELECT shift_type FROM shifts WHERE name = ?", (shift_name,), fetch='one')
-    shift_type = shift_info if shift_info else 'single'
+    shift_type = shift_info[0] if shift_info else 'single'
 
     open_rec = run_query(conn, is_pg, "SELECT id, branch_name, date, check_in FROM attendance WHERE emp_id = ? AND check_out IS NULL ORDER BY id DESC LIMIT 1", (session['emp_id'],), fetch='one')
     done_row = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NOT NULL", (session['emp_id'], today), fetch='one')
-    today_done_count = int(done_row) if done_row else 0
+    today_done_count = int(done_row[0]) if done_row else 0
     max_sessions = 2 if shift_type == 'split' else 1
+
 
     query = "SELECT a.id, a.emp_id, e.name, e.department, a.branch_name, a.date, a.check_in, a.check_out, a.work_hours, COALESCE(a.late_minutes, 0), COALESCE(a.overtime_minutes, 0) FROM attendance a JOIN employees e ON a.emp_id = e.emp_id WHERE 1=1"
     params = []
@@ -175,7 +176,7 @@ def dashboard():
         params.append(end_date)
     query += " ORDER BY a.id DESC"
     raw_records = run_query(conn, is_pg, query, tuple(params), fetch='all')
-    records = [(r, r, r, r, r, r, r, r, r, r, format_mins(r), r, format_mins(r)) for r in raw_records]
+    records = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], format_mins(r[9]), r[10], format_mins(r[10])) for r in raw_records]
     
     stats, employees, branches = {}, [], []
     if session['role'] in ('admin', 'supervisor'):
