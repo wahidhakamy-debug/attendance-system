@@ -304,7 +304,7 @@ def action(type):
 
     now = get_ksa_time()
     today, t_str = now.strftime('%Y-%m-%d'), now.strftime('%H:%M:%S')
-        open_rec = run_query(conn, is_pg, "SELECT id, check_in, branch_name FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NULL ORDER BY id DESC LIMIT 1", (session['emp_id'], today), fetch='one')
+    open_rec = run_query(conn, is_pg, "SELECT id, check_in, branch_name FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NULL ORDER BY id DESC LIMIT 1", (session['emp_id'], today), fetch='one')
     done_today = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NOT NULL", (session['emp_id'], today), fetch='one')[0]
     max_sessions = 2 if s_type == 'split' else 1
     
