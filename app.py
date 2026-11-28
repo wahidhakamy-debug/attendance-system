@@ -180,9 +180,10 @@ def dashboard():
     raw_records = run_query(conn, is_pg, query, tuple(params), fetch='all')
     records = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], format_mins(r[9]), r[10], format_mins(r[10])) for r in raw_records]
     
-    stats, employees, branches = {}, [], []
+        stats, employees, branches = {}, [], []
     if session['role'] in ('admin', 'supervisor'):
         if session['role'] == 'supervisor' and session.get('assigned_branch') != 'جميع الفروع':
+
 
             employees = run_query(conn, is_pg, "SELECT emp_id, name FROM employees WHERE assigned_branch = ?", (session['assigned_branch'],), fetch='all')
             branches = run_query(conn, is_pg, "SELECT id, name FROM branches WHERE name = ?", (session['assigned_branch'],), fetch='all')
