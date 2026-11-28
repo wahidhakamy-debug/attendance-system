@@ -139,7 +139,7 @@ def dashboard():
     end_date = request.args.get('end_date', '')
     
     conn, is_pg = get_db()
-        emp_row = run_query(conn, is_pg, "SELECT COALESCE(assigned_shift, 'الوردية الصباحية') FROM employees WHERE emp_id = ?", (session['emp_id'],), fetch='one')
+    emp_row = run_query(conn, is_pg, "SELECT COALESCE(assigned_shift, 'الوردية الصباحية') FROM employees WHERE emp_id = ?", (session['emp_id'],), fetch='one')
     shift_name = emp_row[0] if emp_row else 'الوردية الصباحية'
     shift_info = run_query(conn, is_pg, "SELECT shift_type FROM shifts WHERE name = ?", (shift_name,), fetch='one')
     shift_type = shift_info[0] if shift_info else 'single'
