@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <h3 style="margin-top:0; color:#0284c7;">➕ إضافة وثيقة رسمية لموظف (إقامة / جواز / رخصة)</h3>
+    <form action="/add_document" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end;">
+        <div>
+            <label>الموظف</label>
+            <select name="emp_id" required>
+                {% for e in employees %}<option value="{{ e.0 }}">{{ e.1 }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>نوع الوثيقة</label>
+            <select name="doc_type" required>
+                <option value="هوية مقيم (إقامة)">🪪 هوية مقيم (إقامة)</option>
+                <option value="جواز سفر">🛂 جواز سفر</option>
+                <option value="رخصة قيادة">🚗 رخصة قيادة</option>
+                <option value="شهادة صحية / بلدية">🏥 شهادة صحية / بلدية</option>
+                <option value="عقد عمل / تأمين">📄 عقد عمل / تأمين</option>
+            </select>
+        </div>
+        <div><label>رقم الوثيقة</label><input type="text" name="doc_number" placeholder="24xxxxxxxx" required></div>
+        <div><label>تاريخ الانتهاء (ميلادي)</label><input type="date" name="expiry_date" required></div>
+        <div><label>ملاحظات (اختياري)</label><input type="text" name="notes" placeholder="مثلاً: كفالة الشركة"></div>
+        <div><button type="submit" class="btn btn-primary" style="padding:12px; width:100%; font-size:16px;">➕ حفظ الوثيقة</button></div>
+    </form>
+</div>
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+        <h3 style="margin:0;">🗂️ سجل الوثائق الرسمية وحالة الصلاحية</h3>
+        <button onclick="window.print()" class="btn" style="background:#334155; padding:9px 16px;">🖨️ طباعة الكشف</button>
+    </div>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>الموظف</th>
+                    <th>نوع الوثيقة</th>
+                    <th>رقم الوثيقة</th>
+                    <th>تاريخ الانتهاء</th>
+                    <th>حالة الصلاحية</th>
+                    <th>ملاحظات</th>
+                    <th class="no-print">إجراء</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in docs %}
+                <tr>
+                    <td><strong>{{ d.emp_name }}</strong></td>
+                    <td>{{ d.doc_type }}</td>
+                    <td><strong>{{ d.doc_number }}</strong></td>
+                    <td>{{ d.expiry_date }}</td>
+                    <td><span style="background:{{ d.style }}; padding:5px 12px; border-radius:12px; font-weight:bold; font-size:14px;">{{ d.status }}</span></td>
+                    <td>{{ d.notes or '--' }}</td>
+                    <td class="no-print">
+                        <a href="/delete_document/{{ d.id }}" onclick="return confirm('حذف هذه الوثيقة؟')" class="btn" style="background:#dc2626; padding:6px 10px; text-decoration:none;">🗑️ حذف</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="text-align:center; color:#64748b;">لا توجد وثائق مسجلة حالياً</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
