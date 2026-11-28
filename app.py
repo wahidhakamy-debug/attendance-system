@@ -179,7 +179,6 @@ def dashboard():
         stats = {'total_emp': len(employees), 'present_today': present[0] if present else 0, 'active_now': active[0] if active else 0, 'pending_leaves': pending_leaves[0] if pending_leaves else 0}
     conn.close()
     return render_template('dashboard.html', page='dashboard', now_time=now.strftime('%H:%M:%S'), now_date=today, open_rec=open_rec, today_done_count=today_done_count, max_sessions=max_sessions, shift_name=shift_name, records=records, stats=stats, employees=employees, branches=branches, emp_filter=emp_filter, start_date=start_date, end_date=end_date)
-
 @app.route('/payroll')
 def payroll_page():
     if session.get('role') != 'admin':
@@ -189,23 +188,25 @@ def payroll_page():
     emps = run_query(conn, is_pg, "SELECT emp_id, name, department, job_title, COALESCE(base_salary, 3000) FROM employees WHERE emp_id != 'admin' ORDER BY id ASC", fetch='all')
     payroll_data = []
     for e in emps:
-        emp_id, name, dept, title, base_sal = e
-        base_sal = float(base_sal or 0)
+        emp_id, name, dept, title, base_sal = e, e, e, e, float(e or 0)
         att = run_query(conn, is_pg, "SELECT COUNT(DISTINCT date), COALESCE(SUM(late_minutes), 0), COALESCE(SUM(overtime_minutes), 0) FROM attendance WHERE emp_id = ? AND date LIKE ?", (emp_id, f"{month}%"), fetch='one')
-        days_present, late_m, ot_m = (int(att[0] or 0), int(att[1] or 0), int(att[2] or 0)) if att else (0, 0, 0)
+        days_present, late_m, ot_m = (int(att or 0), int(att or 0), int(att or 0)) if att else (0, 0, 0)
+        adv_row = run_query(conn, is_pg, "SELECT COALESCE(SUM(amount), 0) FROM advances WHERE emp_id = ? AND deduct_month = ? AND status = 'معتمد ✅'", (emp_id, month), fetch='one')
+        adv_deduct = round(float(adv_row or 0), 2) if adv_row else 0.0
         minute_rate = base_sal / (30 * 8 * 60) if base_sal > 0 else 0
         late_deduct = round(late_m * minute_rate, 2)
         ot_bonus = round(ot_m * minute_rate * 1.5, 2)
-        net_salary = round(max(0, base_sal - late_deduct + ot_bonus), 2)
+        net_salary = round(max(0, base_sal - late_deduct - adv_deduct + ot_bonus), 2)
         payroll_data.append({
             'emp_id': emp_id, 'name': name, 'department': dept, 'job_title': title,
             'base_salary': base_sal, 'days': days_present,
             'late_txt': format_mins(late_m), 'late_deduct': late_deduct,
             'ot_txt': format_mins(ot_m), 'ot_bonus': ot_bonus,
-            'net_salary': net_salary
+            'adv_deduct': adv_deduct, 'net_salary': net_salary
         })
     conn.close()
     return render_template('payroll.html', page='payroll', month=month, payroll_data=payroll_data)
+
 
 @app.route('/shifts')
 def shifts_page():
