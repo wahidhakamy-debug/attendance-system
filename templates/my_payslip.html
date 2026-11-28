@@ -43,14 +43,19 @@
                 <td style="color:#16a34a; font-weight:bold;">+ {{ "%.2f"|format(slip.ot_bonus) }} ر.س</td>
             </tr>
             <tr>
+                <td style="color:#7c3aed;"><strong>+ مكافأة تقييم الأداء الشهري</strong></td>
+                <td>درجة التقييم: {% if slip.eval_score > 0 %}<strong>{{ slip.eval_score }}%</strong>{% else %}غير مقيم بعد{% endif %}</td>
+                <td style="color:#7c3aed; font-weight:bold;">+ {{ "%.2f"|format(slip.eval_bonus) }} ر.س</td>
+            </tr>
+            <tr>
                 <td style="color:#dc2626;"><strong>- خصم التأخير</strong></td>
                 <td>إجمالي التأخير: {{ slip.late_txt }}</td>
                 <td style="color:#dc2626; font-weight:bold;">- {{ "%.2f"|format(slip.late_deduct) }} ر.س</td>
             </tr>
             <tr>
-                <td style="color:#dc2626;"><strong>- استقطاع السُلف والعُهد المعتمدة</strong></td>
+                <td style="color:#d97706;"><strong>- استقطاع السُلف والعُهد المعتمدة</strong></td>
                 <td>مستقطع لشهر {{ month }}</td>
-                <td style="color:#dc2626; font-weight:bold;">- {{ "%.2f"|format(slip.adv_deduct) }} ر.س</td>
+                <td style="color:#d97706; font-weight:bold;">- {{ "%.2f"|format(slip.adv_deduct) }} ر.س</td>
             </tr>
             <tr style="background:#f0fdf4; font-size:18px;">
                 <td colspan="2"><strong>صافي الراتب المستحق للصرف</strong></td>
