@@ -188,11 +188,11 @@ def payroll_page():
     emps = run_query(conn, is_pg, "SELECT emp_id, name, department, job_title, COALESCE(base_salary, 3000) FROM employees WHERE emp_id != 'admin' ORDER BY id ASC", fetch='all')
     payroll_data = []
     for e in emps:
-        emp_id, name, dept, title, base_sal = e, e, e, e, float(e or 0)
+        emp_id, name, dept, title, base_sal = e[0], e[1], e[2], e[3], float(e[4] or 0)
         att = run_query(conn, is_pg, "SELECT COUNT(DISTINCT date), COALESCE(SUM(late_minutes), 0), COALESCE(SUM(overtime_minutes), 0) FROM attendance WHERE emp_id = ? AND date LIKE ?", (emp_id, f"{month}%"), fetch='one')
-        days_present, late_m, ot_m = (int(att or 0), int(att or 0), int(att or 0)) if att else (0, 0, 0)
+        days_present, late_m, ot_m = (int(att[0] or 0), int(att[1] or 0), int(att[2] or 0)) if att else (0, 0, 0)
         adv_row = run_query(conn, is_pg, "SELECT COALESCE(SUM(amount), 0) FROM advances WHERE emp_id = ? AND deduct_month = ? AND status = 'معتمد ✅'", (emp_id, month), fetch='one')
-        adv_deduct = round(float(adv_row or 0), 2) if adv_row else 0.0
+        adv_deduct = round(float(adv_row[0] or 0), 2) if adv_row else 0.0
         minute_rate = base_sal / (30 * 8 * 60) if base_sal > 0 else 0
         late_deduct = round(late_m * minute_rate, 2)
         ot_bonus = round(ot_m * minute_rate * 1.5, 2)
@@ -206,6 +206,85 @@ def payroll_page():
         })
     conn.close()
     return render_template('payroll.html', page='payroll', month=month, payroll_data=payroll_data)
+
+@app.route('/my_payslip')
+def my_payslip():
+    if 'emp_id' not in session:
+        return redirect('/')
+    month = request.args.get('month', get_ksa_time().strftime('%Y-%m'))
+    conn, is_pg = get_db()
+    emp = run_query(conn, is_pg, "SELECT emp_id, name, department, job_title, assigned_branch, COALESCE(assigned_shift, 'الوردية الصباحية'), COALESCE(base_salary, 3000) FROM employees WHERE emp_id = ?", (session['emp_id'],), fetch='one')
+    base_sal = float(emp[6] or 0) if emp else 0.0
+    att = run_query(conn, is_pg, "SELECT COUNT(DISTINCT date), COALESCE(SUM(late_minutes), 0), COALESCE(SUM(overtime_minutes), 0) FROM attendance WHERE emp_id = ? AND date LIKE ?", (session['emp_id'], f"{month}%"), fetch='one')
+    days_present, late_m, ot_m = (int(att[0] or 0), int(att[1] or 0), int(att[2] or 0)) if att else (0, 0, 0)
+    adv_row = run_query(conn, is_pg, "SELECT COALESCE(SUM(amount), 0) FROM advances WHERE emp_id = ? AND deduct_month = ? AND status = 'معتمد ✅'", (session['emp_id'], month), fetch='one')
+    adv_deduct = round(float(adv_row[0] or 0), 2) if adv_row else 0.0
+    minute_rate = base_sal / (30 * 8 * 60) if base_sal > 0 else 0
+    late_deduct = round(late_m * minute_rate, 2)
+    ot_bonus = round(ot_m * minute_rate * 1.5, 2)
+    net_salary = round(max(0, base_sal - late_deduct - adv_deduct + ot_bonus), 2)
+    slip = {
+        'emp_id': emp[0], 'name': emp[1], 'department': emp[2], 'job_title': emp[3],
+        'branch': emp[4], 'shift': emp[5], 'base_salary': base_sal, 'days': days_present,
+        'late_txt': format_mins(late_m), 'late_deduct': late_deduct,
+        'ot_txt': format_mins(ot_m), 'ot_bonus': ot_bonus,
+        'adv_deduct': adv_deduct, 'net_salary': net_salary
+    }
+    conn.close()
+    return render_template('my_payslip.html', page='my_payslip', month=month, slip=slip)
+
+@app.route('/advances')
+def advances_page():
+    if 'emp_id' not in session:
+        return redirect('/')
+    curr_month = get_ksa_time().strftime('%Y-%m')
+    conn, is_pg = get_db()
+    if session['role'] == 'admin':
+        advances = run_query(conn, is_pg, "SELECT id, emp_id, emp_name, adv_type, amount, deduct_month, reason, status FROM advances ORDER BY id DESC", fetch='all')
+    else:
+        advances = run_query(conn, is_pg, "SELECT id, emp_id, emp_name, adv_type, amount, deduct_month, reason, status FROM advances WHERE emp_id = ? ORDER BY id DESC", (session['emp_id'],), fetch='all')
+    conn.close()
+    return render_template('advances.html', page='advances', curr_month=curr_month, advances=advances)
+
+@app.route('/submit_advance', methods=['POST'])
+def submit_advance():
+    if 'emp_id' not in session:
+        return redirect('/')
+    adv_type = request.form['adv_type']
+    amount = float(request.form['amount'])
+    deduct_month = request.form['deduct_month']
+    reason = request.form['reason'].strip()
+    now_str = get_ksa_time().strftime('%Y-%m-%d %H:%M')
+    conn, is_pg = get_db()
+    run_query(conn, is_pg, "INSERT INTO advances (emp_id, emp_name, adv_type, amount, deduct_month, reason, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'قيد المراجعة', ?)",
+              (session['emp_id'], session['name'], adv_type, amount, deduct_month, reason, now_str))
+    conn.commit()
+    conn.close()
+    flash('✅ تم إرسال طلب السُلفة/العُهدة للإدارة بنجاح!')
+    send_telegram(f"💵 طلب سُلفة/عُهدة ({adv_type})\nالموظف: {session['name']} ({session['emp_id']})\nالمبلغ: {amount} ر.س\nشهر الاستقطاع: {deduct_month}\nالسبب: {reason}")
+    return redirect('/advances')
+
+@app.route('/handle_advance/<int:adv_id>/<decision>')
+def handle_advance(adv_id, decision):
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    status = 'معتمد ✅' if decision == 'approve' else 'مرفوض ❌'
+    conn, is_pg = get_db()
+    run_query(conn, is_pg, "UPDATE advances SET status = ? WHERE id = ?", (status, adv_id))
+    conn.commit()
+    conn.close()
+    flash(f'تم تحديث حالة الطلب إلى: {status}')
+    return redirect('/advances')
+
+@app.route('/delete_advance/<int:adv_id>')
+def delete_advance(adv_id):
+    if session.get('role') == 'admin':
+        conn, is_pg = get_db()
+        run_query(conn, is_pg, "DELETE FROM advances WHERE id = ?", (adv_id,))
+        conn.commit()
+        conn.close()
+        flash('🗑️ تم حذف السجل بنجاح')
+    return redirect('/advances')
 
 
 @app.route('/shifts')
