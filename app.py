@@ -153,7 +153,7 @@ def dashboard():
     today_done_count = int(done_row[0]) if done_row else 0
     max_sessions = 2 if shift_type == 'split' else 1
 
-        query = "SELECT a.id, a.emp_id, e.name, e.department, a.branch_name, a.date, a.check_in, a.check_out, a.work_hours, COALESCE(a.late_minutes, 0), COALESCE(a.overtime_minutes, 0) FROM attendance a JOIN employees e ON a.emp_id = e.emp_id WHERE 1=1"
+    query = "SELECT a.id, a.emp_id, e.name, e.department, a.branch_name, a.date, a.check_in, a.check_out, a.work_hours, COALESCE(a.late_minutes, 0), COALESCE(a.overtime_minutes, 0) FROM attendance a JOIN employees e ON a.emp_id = e.emp_id WHERE 1=1"
     params = []
     if session['role'] == 'employee':
         query += " AND a.emp_id = ?"
