@@ -56,27 +56,28 @@ def safe_alter(conn, is_pg, sql):
 def init_db():
     conn, is_pg = get_db()
     pk = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY"
-    run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS employees (id {pk}, emp_id TEXT UNIQUE, name TEXT, department TEXT, job_title TEXT, assigned_branch TEXT, password TEXT, role TEXT)')
+    run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS shifts (id {pk}, name TEXT UNIQUE, shift_type TEXT DEFAULT 'single', start1 TEXT DEFAULT '08:00', end1 TEXT DEFAULT '16:00', start2 TEXT DEFAULT '', end2 TEXT DEFAULT '', grace_period INTEGER DEFAULT 15)")
+    run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS employees (id {pk}, emp_id TEXT UNIQUE, name TEXT, department TEXT, job_title TEXT, assigned_branch TEXT, assigned_shift TEXT DEFAULT 'الوردية الصباحية', password TEXT, role TEXT)")
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS branches (id {pk}, name TEXT, lat REAL, lon REAL, radius INTEGER, start_time TEXT DEFAULT '08:00', end_time TEXT DEFAULT '16:00', grace_period INTEGER DEFAULT 15)")
     run_query(conn, is_pg, f'CREATE TABLE IF NOT EXISTS attendance (id {pk}, emp_id TEXT, branch_name TEXT, date TEXT, check_in TEXT, check_out TEXT, work_hours TEXT, late_minutes INTEGER DEFAULT 0, overtime_minutes INTEGER DEFAULT 0, ip_address TEXT)')
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS leave_requests (id {pk}, emp_id TEXT, emp_name TEXT, req_type TEXT, req_date TEXT, duration_text TEXT, reason TEXT, status TEXT DEFAULT 'قيد المراجعة', created_at TEXT)")
     conn.commit()
 
-    safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN start_time TEXT DEFAULT '08:00'")
-    safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN end_time TEXT DEFAULT '16:00'")
-    safe_alter(conn, is_pg, "ALTER TABLE branches ADD COLUMN grace_period INTEGER DEFAULT 15")
+    safe_alter(conn, is_pg, "ALTER TABLE employees ADD COLUMN assigned_shift TEXT DEFAULT 'الوردية الصباحية'")
     safe_alter(conn, is_pg, "ALTER TABLE attendance ADD COLUMN late_minutes INTEGER DEFAULT 0")
     safe_alter(conn, is_pg, "ALTER TABLE attendance ADD COLUMN overtime_minutes INTEGER DEFAULT 0")
 
-    b_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM branches", fetch='one')[0]
-    if b_count == 0:
-        run_query(conn, is_pg, "INSERT INTO branches (name, lat, lon, radius, start_time, end_time, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  ('الفرع الرئيسي', 16.9688, 42.8325, 200, '08:00', '16:00', 15))
+    s_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM shifts", fetch='one')
+    if s_count[0] == 0:
+        run_query(conn, is_pg, "INSERT INTO shifts (name, shift_type, start1, end1, start2, end2, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)", ('الوردية الصباحية', 'single', '08:00', '16:00', '', '', 15))
+        run_query(conn, is_pg, "INSERT INTO shifts (name, shift_type, start1, end1, start2, end2, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)", ('الوردية المسائية', 'single', '16:00', '00:00', '', '', 15))
+        run_query(conn, is_pg, "INSERT INTO shifts (name, shift_type, start1, end1, start2, end2, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)", ('الوردية الليلية', 'single', '00:00', '08:00', '', '', 15))
+        run_query(conn, is_pg, "INSERT INTO shifts (name, shift_type, start1, end1, start2, end2, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)", ('دوام فترتين (متقطع)', 'split', '08:00', '12:00', '16:00', '20:00', 15))
 
-    e_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM employees", fetch='one')[0]
-    if e_count == 0:
-        run_query(conn, is_pg, "INSERT INTO employees (emp_id, name, department, job_title, assigned_branch, password, role) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  ('admin', 'وحيد - مدير الموارد البشرية', 'الإدارة العليا', 'مدير النظام', 'جميع الفروع', generate_password_hash('123456'), 'admin'))
+    e_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM employees", fetch='one')
+    if e_count[0] == 0:
+        run_query(conn, is_pg, "INSERT INTO employees (emp_id, name, department, job_title, assigned_branch, assigned_shift, password, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  ('admin', 'وحيد - مدير الموارد البشرية', 'الإدارة العليا', 'مدير النظام', 'جميع الفروع', 'الوردية الصباحية', generate_password_hash('123456'), 'admin'))
     conn.commit()
     conn.close()
 
@@ -90,10 +91,17 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     a = math.sin(dphi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2)**2
     return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
 
-def calculate_duration(in_str, out_str):
-    diff = datetime.strptime(out_str, '%H:%M:%S') - datetime.strptime(in_str, '%H:%M:%S')
-    sec = max(0, int(diff.total_seconds()))
-    return f"{sec // 3600} س و {(sec % 3600) // 60} د"
+def time_to_mins(t_str):
+    parts = t_str.split(':')
+    return int(parts[0]) * 60 + int(parts[1])
+
+def span_mins(start_hm, end_hm):
+    s, e = time_to_mins(start_hm), time_to_mins(end_hm)
+    return (e - s) if e > s else (1440 - s + e)
+
+def worked_span_mins(in_hms, out_hms):
+    s, e = time_to_mins(in_hms), time_to_mins(out_hms)
+    return (e - s) if e >= s else (1440 - s + e)
 
 def format_mins(mins):
     mins = int(mins or 0)
@@ -102,7 +110,6 @@ def format_mins(mins):
     if mins < 60:
         return f"{mins} د"
     return f"{mins // 60} س و {mins % 60} د"
-
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if 'emp_id' in session:
@@ -130,8 +137,15 @@ def dashboard():
     end_date = request.args.get('end_date', '')
     
     conn, is_pg = get_db()
-    today_rec = run_query(conn, is_pg, "SELECT id, emp_id, branch_name, date, check_in, check_out, work_hours FROM attendance WHERE emp_id = ? AND date = ?", (session['emp_id'], today), fetch='one')
-    
+    emp_row = run_query(conn, is_pg, "SELECT COALESCE(assigned_shift, 'الوردية الصباحية') FROM employees WHERE emp_id = ?", (session['emp_id'],), fetch='one')
+    shift_name = emp_row[0] if emp_row else 'الوردية الصباحية'
+    shift_info = run_query(conn, is_pg, "SELECT shift_type, start1, end1, start2, end2 FROM shifts WHERE name = ?", (shift_name,), fetch='one')
+    shift_type = shift_info[0] if shift_info else 'single'
+
+    open_rec = run_query(conn, is_pg, "SELECT id, branch_name, date, check_in FROM attendance WHERE emp_id = ? AND check_out IS NULL ORDER BY id DESC LIMIT 1", (session['emp_id'],), fetch='one')
+    today_done_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NOT NULL", (session['emp_id'], today), fetch='one')[0]
+    max_sessions = 2 if shift_type == 'split' else 1
+
     query = "SELECT a.emp_id, e.name, e.department, a.branch_name, a.date, a.check_in, a.check_out, a.work_hours, COALESCE(a.late_minutes, 0), COALESCE(a.overtime_minutes, 0) FROM attendance a JOIN employees e ON a.emp_id = e.emp_id WHERE 1=1"
     params = []
     if session['role'] != 'admin':
@@ -150,22 +164,70 @@ def dashboard():
     raw_records = run_query(conn, is_pg, query, tuple(params), fetch='all')
     records = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], format_mins(r[8]), r[9], format_mins(r[9])) for r in raw_records]
     
-    stats, employees, pending_leaves = {}, [], 0
+    stats, employees = {}, []
     if session['role'] == 'admin':
         employees = run_query(conn, is_pg, "SELECT emp_id, name FROM employees", fetch='all')
-        present = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE date = ?", (today,), fetch='one')[0]
-        active = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE date = ? AND check_out IS NULL", (today,), fetch='one')[0]
+        present = run_query(conn, is_pg, "SELECT COUNT(DISTINCT emp_id) FROM attendance WHERE date = ?", (today,), fetch='one')[0]
+        active = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE check_out IS NULL", fetch='one')[0]
         pending_leaves = run_query(conn, is_pg, "SELECT COUNT(*) FROM leave_requests WHERE status = 'قيد المراجعة'", fetch='one')[0]
         stats = {'total_emp': len(employees), 'present_today': present, 'active_now': active, 'pending_leaves': pending_leaves}
     conn.close()
-    return render_template('dashboard.html', page='dashboard', now_time=now.strftime('%H:%M:%S'), now_date=today, today_rec=today_rec, records=records, stats=stats, employees=employees, emp_filter=emp_filter, start_date=start_date, end_date=end_date)
+    return render_template('dashboard.html', page='dashboard', now_time=now.strftime('%H:%M:%S'), now_date=today, open_rec=open_rec, today_done_count=today_done_count, max_sessions=max_sessions, shift_name=shift_name, records=records, stats=stats, employees=employees, emp_filter=emp_filter, start_date=start_date, end_date=end_date)
+
+@app.route('/shifts')
+def shifts_page():
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    conn, is_pg = get_db()
+    shifts = run_query(conn, is_pg, "SELECT id, name, shift_type, start1, end1, COALESCE(start2, ''), COALESCE(end2, ''), grace_period FROM shifts ORDER BY id ASC", fetch='all')
+    conn.close()
+    return render_template('shifts.html', page='shifts', shifts=shifts)
+
+@app.route('/add_shift', methods=['POST'])
+def add_shift():
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    conn, is_pg = get_db()
+    try:
+        run_query(conn, is_pg, "INSERT INTO shifts (name, shift_type, start1, end1, start2, end2, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (request.form['name'].strip(), request.form['shift_type'], request.form['start1'], request.form['end1'],
+                   request.form.get('start2', ''), request.form.get('end2', ''), int(request.form['grace_period'])))
+        conn.commit()
+        flash('✅ تم إضافة الوردية بنجاح!')
+    except Exception:
+        conn.rollback()
+        flash('❌ خطأ: اسم الوردية مسجل مسبقاً!')
+    conn.close()
+    return redirect('/shifts')
+
+@app.route('/edit_shift/<int:s_id>', methods=['POST'])
+def edit_shift(s_id):
+    if session.get('role') != 'admin':
+        return redirect('/dashboard')
+    conn, is_pg = get_db()
+    run_query(conn, is_pg, "UPDATE shifts SET name=?, shift_type=?, start1=?, end1=?, start2=?, end2=?, grace_period=? WHERE id=?",
+              (request.form['name'].strip(), request.form['shift_type'], request.form['start1'], request.form['end1'],
+               request.form.get('start2', ''), request.form.get('end2', ''), int(request.form['grace_period']), s_id))
+    conn.commit()
+    conn.close()
+    flash('✅ تم حفظ تعديلات الوردية بنجاح!')
+    return redirect('/shifts')
+
+@app.route('/delete_shift/<int:s_id>')
+def delete_shift(s_id):
+    if session.get('role') == 'admin':
+        conn, is_pg = get_db()
+        run_query(conn, is_pg, "DELETE FROM shifts WHERE id = ?", (s_id,))
+        conn.commit()
+        conn.close()
+        flash('تم حذف الوردية')
+    return redirect('/shifts')
 
 @app.route('/leaves')
 def leaves_page():
     if 'emp_id' not in session:
         return redirect('/')
-    now = get_ksa_time()
-    today = now.strftime('%Y-%m-%d')
+    today = get_ksa_time().strftime('%Y-%m-%d')
     conn, is_pg = get_db()
     if session['role'] == 'admin':
         leaves = run_query(conn, is_pg, "SELECT id, emp_id, emp_name, req_type, req_date, duration_text, reason, status FROM leave_requests ORDER BY id DESC", fetch='all')
@@ -179,20 +241,20 @@ def employees_page():
     if session.get('role') != 'admin':
         return redirect('/dashboard')
     conn, is_pg = get_db()
-    employees = run_query(conn, is_pg, "SELECT emp_id, name, department, job_title, assigned_branch, role FROM employees ORDER BY id ASC", fetch='all')
+    employees = run_query(conn, is_pg, "SELECT emp_id, name, department, job_title, assigned_branch, COALESCE(assigned_shift, 'الوردية الصباحية'), role FROM employees ORDER BY id ASC", fetch='all')
     branches = run_query(conn, is_pg, "SELECT id, name FROM branches", fetch='all')
+    shifts = run_query(conn, is_pg, "SELECT id, name FROM shifts ORDER BY id ASC", fetch='all')
     conn.close()
-    return render_template('employees.html', page='employees', employees=employees, branches=branches)
+    return render_template('employees.html', page='employees', employees=employees, branches=branches, shifts=shifts)
 
 @app.route('/branches')
 def branches_page():
     if session.get('role') != 'admin':
         return redirect('/dashboard')
     conn, is_pg = get_db()
-    branches = run_query(conn, is_pg, "SELECT id, name, lat, lon, radius, COALESCE(start_time, '08:00'), COALESCE(end_time, '16:00'), COALESCE(grace_period, 15) FROM branches ORDER BY id ASC", fetch='all')
+    branches = run_query(conn, is_pg, "SELECT id, name, lat, lon, radius FROM branches ORDER BY id ASC", fetch='all')
     conn.close()
     return render_template('branches.html', page='branches', branches=branches)
-
 @app.route('/action/<type>', methods=['POST'])
 def action(type):
     if 'emp_id' not in session:
@@ -204,13 +266,19 @@ def action(type):
         return redirect('/dashboard')
         
     conn, is_pg = get_db()
-    emp_data = run_query(conn, is_pg, "SELECT assigned_branch FROM employees WHERE emp_id = ?", (session['emp_id'],), fetch='one')
-    assigned = emp_data if emp_data else 'جميع الفروع'
+    emp_data = run_query(conn, is_pg, "SELECT assigned_branch, COALESCE(assigned_shift, 'الوردية الصباحية') FROM employees WHERE emp_id = ?", (session['emp_id'],), fetch='one')
+    assigned = emp_data[0] if emp_data else 'جميع الفروع'
+    shift_name = emp_data[1] if emp_data else 'الوردية الصباحية'
     
+    shift_info = run_query(conn, is_pg, "SELECT shift_type, start1, end1, COALESCE(start2, ''), COALESCE(end2, ''), grace_period FROM shifts WHERE name = ?", (shift_name,), fetch='one')
+    if not shift_info:
+        shift_info = ('single', '08:00', '16:00', '', '', 15)
+    s_type, s_start1, s_end1, s_start2, s_end2, s_grace = shift_info
+
     if assigned == 'جميع الفروع':
-        branches = run_query(conn, is_pg, "SELECT id, name, lat, lon, radius, COALESCE(start_time, '08:00'), COALESCE(end_time, '16:00'), COALESCE(grace_period, 15) FROM branches", fetch='all')
+        branches = run_query(conn, is_pg, "SELECT id, name, lat, lon, radius FROM branches", fetch='all')
     else:
-        branches = run_query(conn, is_pg, "SELECT id, name, lat, lon, radius, COALESCE(start_time, '08:00'), COALESCE(end_time, '16:00'), COALESCE(grace_period, 15) FROM branches WHERE name = ?", (assigned,), fetch='all')
+        branches = run_query(conn, is_pg, "SELECT id, name, lat, lon, radius FROM branches WHERE name = ?", (assigned,), fetch='all')
         
     if not branches:
         conn.close()
@@ -220,10 +288,10 @@ def action(type):
     matched_branch = None
     min_distance = float('inf')
     for b in branches:
-        dist = calculate_distance(b, b, float(lat), float(lon))
+        dist = calculate_distance(b[2], b[3], float(lat), float(lon))
         if dist < min_distance:
             min_distance = dist
-        if dist <= b:
+        if dist <= b[4]:
             matched_branch = b
             break
             
@@ -234,36 +302,39 @@ def action(type):
 
     now = get_ksa_time()
     today, t_str = now.strftime('%Y-%m-%d'), now.strftime('%H:%M:%S')
-    rec = run_query(conn, is_pg, "SELECT id, check_in, check_out, branch_name FROM attendance WHERE emp_id = ? AND date = ?", (session['emp_id'], today), fetch='one')
+    open_rec = run_query(conn, is_pg, "SELECT id, check_in, branch_name FROM attendance WHERE emp_id = ? AND check_out IS NULL ORDER BY id DESC LIMIT 1", (session['emp_id'],), fetch='one')
+    done_today = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NOT NULL", (session['emp_id'], today), fetch='one')[0]
+    max_sessions = 2 if s_type == 'split' else 1
     
-    if type == 'in' and not rec:
-        b_name, b_start, b_grace = matched_branch, matched_branch, int(matched_branch)
-        in_dt = datetime.strptime(t_str, '%H:%M:%S')
-        start_dt = datetime.strptime(b_start, '%H:%M')
-        allowed_dt = start_dt + timedelta(minutes=b_grace)
-        late_mins = int((in_dt - start_dt).total_seconds() // 60) if in_dt > allowed_dt else 0
+    if type == 'in' and not open_rec and done_today < max_sessions:
+        target_start = s_start2 if (s_type == 'split' and done_today == 1 and s_start2) else s_start1
+        now_mins = time_to_mins(t_str)
+        start_mins = time_to_mins(target_start)
+        diff_mins = now_mins - start_mins
+        if diff_mins < -720:
+            diff_mins += 1440
+        late_mins = diff_mins if diff_mins > int(s_grace) else 0
         
         run_query(conn, is_pg, "INSERT INTO attendance (emp_id, branch_name, date, check_in, late_minutes, ip_address) VALUES (?, ?, ?, ?, ?, ?)",
-                  (session['emp_id'], b_name, today, t_str, late_mins, request.remote_addr))
+                  (session['emp_id'], matched_branch[1], today, t_str, late_mins, request.remote_addr))
         late_txt = f"⚠️ تأخير: {format_mins(late_mins)}" if late_mins > 0 else "✅ منضبط"
-        flash(f'✅ تم تسجيل حضورك في ({b_name}) الساعة {t_str} | {late_txt}')
-        send_telegram(f"🟢 تسجيل حضور\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {b_name}\nالوقت: {t_str}\nالحالة: {late_txt}")
+        flash(f'✅ تم تسجيل حضورك ({shift_name}) في ({matched_branch[1]}) الساعة {t_str} | {late_txt}')
+        send_telegram(f"🟢 تسجيل حضور ({shift_name})\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {matched_branch[1]}\nالوقت: {t_str}\nالحالة: {late_txt}")
         
-    elif type == 'out' and rec and not rec:
-        dur = calculate_duration(rec, t_str)
-        b_info = run_query(conn, is_pg, "SELECT COALESCE(start_time, '08:00'), COALESCE(end_time, '16:00') FROM branches WHERE name = ?", (rec,), fetch='one')
-        b_start = b_info if b_info else matched_branch
-        b_end = b_info if b_info else matched_branch
-        
-        worked_mins = max(0, int((datetime.strptime(t_str, '%H:%M:%S') - datetime.strptime(rec, '%H:%M:%S')).total_seconds() // 60))
-        required_mins = max(0, int((datetime.strptime(b_end, '%H:%M') - datetime.strptime(b_start, '%H:%M')).total_seconds() // 60))
-        ot_mins = max(0, worked_mins - required_mins) if worked_mins > required_mins else 0
+    elif type == 'out' and open_rec:
+        w_mins = worked_span_mins(open_rec[1], t_str)
+        dur_txt = format_mins(w_mins)
+        if s_type == 'split' and s_start2 and s_end2:
+            req_mins = span_mins(s_start1, s_end1) if done_today == 0 else span_mins(s_start2, s_end2)
+        else:
+            req_mins = span_mins(s_start1, s_end1)
+        ot_mins = (w_mins - req_mins) if w_mins > req_mins else 0
         
         run_query(conn, is_pg, "UPDATE attendance SET check_out = ?, work_hours = ?, overtime_minutes = ? WHERE id = ?",
-                  (t_str, dur, ot_mins, rec))
+                  (t_str, dur_txt, ot_mins, open_rec[0]))
         ot_txt = f" | ⭐ إضافي: {format_mins(ot_mins)}" if ot_mins > 0 else ""
-        flash(f'🚪 تم تسجيل انصرافك من ({rec}) الساعة {t_str} | ساعات العمل: {dur}{ot_txt}')
-        send_telegram(f"🔴 تسجيل انصراف\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {rec}\nالوقت: {t_str}\nساعات العمل: {dur}{ot_txt}")
+        flash(f'🚪 تم تسجيل انصرافك من ({open_rec[2]}) الساعة {t_str} | ساعات العمل: {dur_txt}{ot_txt}')
+        send_telegram(f"🔴 تسجيل انصراف ({shift_name})\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {open_rec[2]}\nالوقت: {t_str}\nساعات العمل: {dur_txt}{ot_txt}")
         
     conn.commit()
     conn.close()
@@ -316,12 +387,11 @@ def add_branch():
     if session.get('role') != 'admin':
         return redirect('/dashboard')
     conn, is_pg = get_db()
-    run_query(conn, is_pg, "INSERT INTO branches (name, lat, lon, radius, start_time, end_time, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)",
-              (request.form['name'].strip(), float(request.form['lat']), float(request.form['lon']), int(request.form['radius']),
-               request.form['start_time'], request.form['end_time'], int(request.form['grace_period'])))
+    run_query(conn, is_pg, "INSERT INTO branches (name, lat, lon, radius) VALUES (?, ?, ?, ?)",
+              (request.form['name'].strip(), float(request.form['lat']), float(request.form['lon']), int(request.form['radius'])))
     conn.commit()
     conn.close()
-    flash('✅ تم إضافة الفرع ومواعيد دوامه بنجاح!')
+    flash('✅ تم إضافة الفرع بنجاح!')
     return redirect('/branches')
 
 @app.route('/edit_branch/<int:b_id>', methods=['POST'])
@@ -329,12 +399,11 @@ def edit_branch(b_id):
     if session.get('role') != 'admin':
         return redirect('/dashboard')
     conn, is_pg = get_db()
-    run_query(conn, is_pg, "UPDATE branches SET name=?, lat=?, lon=?, radius=?, start_time=?, end_time=?, grace_period=? WHERE id=?",
-              (request.form['name'].strip(), float(request.form['lat']), float(request.form['lon']), int(request.form['radius']),
-               request.form['start_time'], request.form['end_time'], int(request.form['grace_period']), b_id))
+    run_query(conn, is_pg, "UPDATE branches SET name=?, lat=?, lon=?, radius=? WHERE id=?",
+              (request.form['name'].strip(), float(request.form['lat']), float(request.form['lon']), int(request.form['radius']), b_id))
     conn.commit()
     conn.close()
-    flash('✅ تم حفظ تعديلات الفرع ومواعيد الدوام بنجاح!')
+    flash('✅ تم حفظ تعديلات الفرع بنجاح!')
     return redirect('/branches')
 
 @app.route('/delete_branch/<int:b_id>')
@@ -353,10 +422,10 @@ def add_employee():
         return redirect('/dashboard')
     conn, is_pg = get_db()
     try:
-        run_query(conn, is_pg, "INSERT INTO employees (emp_id, name, department, job_title, assigned_branch, password, role) VALUES (?, ?, ?, ?, ?, ?, 'employee')",
-                  (request.form['emp_id'].strip(), request.form['name'].strip(), request.form['department'].strip(), request.form['job_title'].strip(), request.form['assigned_branch'], generate_password_hash(request.form['password'].strip())))
+        run_query(conn, is_pg, "INSERT INTO employees (emp_id, name, department, job_title, assigned_branch, assigned_shift, password, role) VALUES (?, ?, ?, ?, ?, ?, ?, 'employee')",
+                  (request.form['emp_id'].strip(), request.form['name'].strip(), request.form['department'].strip(), request.form['job_title'].strip(), request.form['assigned_branch'], request.form['assigned_shift'], generate_password_hash(request.form['password'].strip())))
         conn.commit()
-        flash('✅ تم إضافة الموظف وربطه بفرعه بنجاح!')
+        flash('✅ تم إضافة الموظف وربطه بالفرع والوردية بنجاح!')
     except Exception:
         conn.rollback()
         flash('❌ خطأ: الرقم الوظيفي مسجل مسبقاً!')
@@ -368,14 +437,15 @@ def edit_employee(emp_id):
     if session.get('role') != 'admin':
         return redirect('/dashboard')
     conn, is_pg = get_db()
-    name, dept, title, branch = request.form['name'].strip(), request.form['department'].strip(), request.form['job_title'].strip(), request.form['assigned_branch']
+    name, dept, title = request.form['name'].strip(), request.form['department'].strip(), request.form['job_title'].strip()
+    branch, shift = request.form['assigned_branch'], request.form['assigned_shift']
     new_pass = request.form.get('password', '').strip()
     if new_pass:
-        run_query(conn, is_pg, "UPDATE employees SET name=?, department=?, job_title=?, assigned_branch=?, password=? WHERE emp_id=?",
-                  (name, dept, title, branch, generate_password_hash(new_pass), emp_id))
+        run_query(conn, is_pg, "UPDATE employees SET name=?, department=?, job_title=?, assigned_branch=?, assigned_shift=?, password=? WHERE emp_id=?",
+                  (name, dept, title, branch, shift, generate_password_hash(new_pass), emp_id))
     else:
-        run_query(conn, is_pg, "UPDATE employees SET name=?, department=?, job_title=?, assigned_branch=? WHERE emp_id=?",
-                  (name, dept, title, branch, emp_id))
+        run_query(conn, is_pg, "UPDATE employees SET name=?, department=?, job_title=?, assigned_branch=?, assigned_shift=? WHERE emp_id=?",
+                  (name, dept, title, branch, shift, emp_id))
     conn.commit()
     conn.close()
     flash('✅ تم حفظ تعديلات الموظف بنجاح!')
@@ -412,7 +482,7 @@ def export_csv():
     raw_rows = run_query(conn, is_pg, query, tuple(params), fetch='all')
     conn.close()
     
-    formatted_rows = [(r, r, r, r, r, r, r, r, format_mins(r), format_mins(r)) for r in raw_rows]
+    formatted_rows = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], format_mins(r[8]), format_mins(r[9])) for r in raw_rows]
     out = io.StringIO()
     out.write('\ufeff')
     w = csv.writer(out, delimiter=';')
