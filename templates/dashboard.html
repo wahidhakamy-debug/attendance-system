@@ -29,23 +29,24 @@
     <p style="color:#64748b; font-size:16px;">التاريخ: <strong>{{ now_date }}</strong> | الوقت الحالي: <strong id="clock">{{ now_time }}</strong></p>
     <div id="gps-status" style="margin-bottom:15px; font-weight:bold; color:#0284c7;">📡 جاري تحديد موقعك الجغرافي...</div>
     
-    <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
-        {% if not today_rec %}
-        <form action="/action/in" method="POST">
-            <input type="hidden" name="lat" class="lat-input"><input type="hidden" name="lon" class="lon-input">
-            <button type="submit" class="btn" style="background:#16a34a; padding:15px 35px; font-size:18px;">✅ تسجيل حضور</button>
-        </form>
-        {% elif not today_rec.5 %}
+       <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+        {% if open_rec %}
         <form action="/action/out" method="POST">
             <input type="hidden" name="lat" class="lat-input"><input type="hidden" name="lon" class="lon-input">
-            <button type="submit" class="btn" style="background:#dc2626; padding:15px 35px; font-size:18px;">🚪 تسجيل انصراف</button>
+            <button type="submit" class="btn" style="background:#dc2626; padding:15px 35px; font-size:18px;">🚪 تسجيل انصراف (بدأ {{ open_rec.3 }})</button>
+        </form>
+        {% elif today_done_count < max_sessions %}
+        <form action="/action/in" method="POST">
+            <input type="hidden" name="lat" class="lat-input"><input type="hidden" name="lon" class="lon-input">
+            <button type="submit" class="btn" style="background:#16a34a; padding:15px 35px; font-size:18px;">✅ تسجيل حضور {% if max_sessions == 2 %}(الفترة {{ today_done_count + 1 }}){% endif %}</button>
         </form>
         {% else %}
         <div style="background:#f8fafc; padding:12px 25px; border-radius:10px; border:1px solid #cbd5e1; font-weight:bold; color:#15803d;">
-            🎉 أتممت تسجيل حضورك وانصرافك لهذا اليوم بنجاح ({{ today_rec.6 }})
+            🎉 أتممت تسجيل حضورك وانصرافك بالكامل لهذا اليوم بنجاح!
         </div>
         {% endif %}
     </div>
+
 </div>
 
 <div class="card">
