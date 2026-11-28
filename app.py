@@ -139,6 +139,11 @@ def dashboard():
     now = get_ksa_time()
     today = now.strftime('%Y-%m-%d')
     emp_filter = request.args.get('emp_id', '')
+    emp_filter = request.args.get('emp_id', '')
+    search_name = request.args.get('search_name', '').strip()
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
     
