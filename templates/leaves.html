@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <h3 style="margin-top:0; color:#7c3aed;">📩 تقديم طلب إجازة أو استئذان</h3>
+    <form action="/submit_leave" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end; margin-bottom: 20px;">
+        <div>
+            <label>نوع الطلب</label>
+            <select name="req_type" required>
+                <option value="إجازة سنوية">🌴 إجازة سنوية</option>
+                <option value="إجازة مرضية">🏥 إجازة مرضية</option>
+                <option value="إجازة طارئة">⚡ إجازة طارئة</option>
+                <option value="استئذان ساعات">⏱️ استئذان ساعات</option>
+            </select>
+        </div>
+        <div><label>التاريخ</label><input type="date" name="req_date" value="{{ now_date }}" required></div>
+        <div><label>المدة (مثلاً: يوم واحد / ساعتان)</label><input type="text" name="duration_text" placeholder="يوم واحد" required></div>
+        <div><label>السبب / ملاحظات</label><input type="text" name="reason" placeholder="اكتب سبب الطلب..." required></div>
+        <div><button type="submit" class="btn" style="background:#7c3aed; padding:12px; width:100%; font-size:16px;">📤 إرسال الطلب</button></div>
+    </form>
+</div>
+
+<div class="card">
+    <h3 style="margin-top:0;">📋 سجل طلبات الإجازات والاستئذان</h3>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>الموظف</th><th>نوع الطلب</th><th>التاريخ</th><th>المدة</th><th>السبب</th><th>الحالة</th>{% if session['role'] == 'admin' %}<th>القرار</th>{% endif %}</tr>
+            </thead>
+            <tbody>
+                {% for lv in leaves %}
+                <tr>
+                    <td><strong>{{ lv.2 }}</strong></td>
+                    <td>{{ lv.3 }}</td>
+                    <td>{{ lv.4 }}</td>
+                    <td>{{ lv.5 }}</td>
+                    <td>{{ lv.6 }}</td>
+                    <td><strong>{{ lv.7 }}</strong></td>
+                    {% if session['role'] == 'admin' %}
+                    <td style="white-space: nowrap;">
+                        <a href="/handle_leave/{{ lv.0 }}/approve" style="background:#16a34a; color:white; padding:6px 10px; border-radius:6px; text-decoration:none; font-weight:bold;">✅ قبول</a>
+                        <a href="/handle_leave/{{ lv.0 }}/reject" style="background:#f59e0b; color:white; padding:6px 10px; border-radius:6px; text-decoration:none; font-weight:bold;">❌ رفض</a>
+                        <a href="/delete_leave/{{ lv.0 }}" onclick="return confirm('حذف هذا الطلب؟')" style="background:#dc2626; color:white; padding:6px 10px; border-radius:6px; text-decoration:none; font-weight:bold;">🗑️ حذف</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="text-align:center; color:#64748b;">لا توجد طلبات مسجلة حالياً</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
