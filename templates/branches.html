@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <h3 style="margin-top:0; color:#0284c7;">➕ إضافة فرع جديد ومواعيد دوامه (GPS)</h3>
+    <form action="/add_branch" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end;">
+        <div><label>اسم الفرع</label><input type="text" name="name" placeholder="فرع أبو عريش" required></div>
+        <div><label>خط العرض (Lat)</label><input type="text" name="lat" placeholder="16.9688" required></div>
+        <div><label>خط الطول (Lon)</label><input type="text" name="lon" placeholder="42.8325" required></div>
+        <div><label>النطاق (متر)</label><input type="number" name="radius" value="200" required></div>
+        <div><label>بداية الدوام</label><input type="time" name="start_time" value="08:00" required></div>
+        <div><label>نهاية الدوام</label><input type="time" name="end_time" value="16:00" required></div>
+        <div><label>سماح التأخير (د)</label><input type="number" name="grace_period" value="15" required></div>
+        <div><button type="submit" class="btn btn-primary" style="padding:12px; width:100%; font-size:16px;">➕ إضافة الفرع</button></div>
+    </form>
+</div>
+
+<div class="card">
+    <h3 style="margin-top:0;">📍 الفروع المسجلة ومواعيد الدوام الرسمي</h3>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>اسم الفرع</th><th>خط العرض</th><th>خط الطول</th><th>النطاق</th><th>بداية الدوام</th><th>نهاية الدوام</th><th>سماح (د)</th><th>إجراء</th></tr>
+            </thead>
+            <tbody>
+                {% for b in branches %}
+                <tr>
+                    <form action="/edit_branch/{{ b.0 }}" method="POST">
+                        <td><input type="text" name="name" value="{{ b.1 }}" required style="padding:6px; font-size:14px;"></td>
+                        <td><input type="text" name="lat" value="{{ b.2 }}" required style="padding:6px; font-size:14px; width:95px;"></td>
+                        <td><input type="text" name="lon" value="{{ b.3 }}" required style="padding:6px; font-size:14px; width:95px;"></td>
+                        <td><input type="number" name="radius" value="{{ b.4 }}" required style="padding:6px; font-size:14px; width:65px;"></td>
+                        <td><input type="time" name="start_time" value="{{ b.5 }}" required style="padding:6px; font-size:14px;"></td>
+                        <td><input type="time" name="end_time" value="{{ b.6 }}" required style="padding:6px; font-size:14px;"></td>
+                        <td><input type="number" name="grace_period" value="{{ b.7 }}" required style="padding:6px; font-size:14px; width:60px;"></td>
+                        <td style="white-space: nowrap;">
+                            <button type="submit" class="btn" style="background:#16a34a; padding:7px 10px;">💾 حفظ</button>
+                            <a href="/delete_branch/{{ b.0 }}" onclick="return confirm('حذف هذا الفرع؟')" class="btn" style="background:#dc2626; padding:7px 10px; text-decoration:none;">حذف</a>
+                        </td>
+                    </form>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
