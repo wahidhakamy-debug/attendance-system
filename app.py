@@ -143,7 +143,6 @@ def dashboard():
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
 
-    
     conn, is_pg = get_db()
     emp_row = run_query(conn, is_pg, "SELECT COALESCE(assigned_shift, 'الوردية الصباحية') FROM employees WHERE emp_id = ?", (session['emp_id'],), fetch='one')
     shift_name = emp_row[0] if emp_row else 'الوردية الصباحية'
@@ -163,17 +162,11 @@ def dashboard():
     elif session['role'] == 'supervisor' and session.get('assigned_branch') != 'جميع الفروع':
         query += " AND e.assigned_branch = ?"
         params.append(session['assigned_branch'])
+    
     if emp_filter:
-            if emp_filter:
         query += " AND a.emp_id = ?"
         params.append(emp_filter)
     if search_name:
-        query += " AND (e.name LIKE ? OR e.emp_id LIKE ?)"
-        params.extend([f"%{search_name}%", f"%{search_name}%"])
-
-        query += " AND a.emp_id = ?"
-        params.append(emp_filter)
-            if search_name:
         query += " AND (e.name LIKE ? OR e.emp_id LIKE ?)"
         params.extend([f"%{search_name}%", f"%{search_name}%"])
 
