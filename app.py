@@ -273,6 +273,17 @@ def handle_leave(req_id, decision):
     flash(f'تم تحديث حالة الطلب إلى: {status}')
     return redirect('/dashboard')
 
+@app.route('/delete_leave/<int:req_id>')
+def delete_leave(req_id):
+    if session.get('role') == 'admin':
+        conn, is_pg = get_db()
+        run_query(conn, is_pg, "DELETE FROM leave_requests WHERE id = ?", (req_id,))
+        conn.commit()
+        conn.close()
+        flash('🗑️ تم حذف الطلب بنجاح')
+    return redirect('/dashboard')
+
+
 @app.route('/add_branch', methods=['POST'])
 def add_branch():
     if session.get('role') != 'admin':
