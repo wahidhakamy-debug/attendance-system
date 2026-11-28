@@ -140,6 +140,7 @@
                         <td style="white-space: nowrap;">
                             <a href="/handle_leave/{{ lv.0 }}/approve" style="background:#16a34a; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:bold;">✅ قبول</a>
                             <a href="/handle_leave/{{ lv.0 }}/reject" style="background:#dc2626; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:bold;">❌ رفض</a>
+                            <a href="/delete_leave/{{ lv.0 }}" onclick="return confirm('هل أنت متأكد من حذف هذا الطلب؟')" style="background:#dc2626; color:white; padding:6px 10px; border-radius:6px; text-decoration:none; font-weight:bold;">🗑️ حذف</a>
                         </td>
                         {% endif %}
                     </tr>
