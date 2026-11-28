@@ -73,6 +73,7 @@ def init_db():
         run_query(conn, is_pg, "INSERT INTO shifts (name, shift_type, start1, end1, start2, end2, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)", ('الوردية المسائية', 'single', '16:00', '00:00', '', '', 15))
         run_query(conn, is_pg, "INSERT INTO shifts (name, shift_type, start1, end1, start2, end2, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)", ('الوردية الليلية', 'single', '00:00', '08:00', '', '', 15))
         run_query(conn, is_pg, "INSERT INTO shifts (name, shift_type, start1, end1, start2, end2, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)", ('دوام فترتين (متقطع)', 'split', '08:00', '12:00', '16:00', '20:00', 15))
+        run_query(conn, is_pg, "INSERT INTO shifts (name, shift_type, start1, end1, start2, end2, grace_period) VALUES (?, ?, ?, ?, ?, ?, ?)", ('الوردية المرنة (8 ساعات)', 'flexible', '08:00', '16:00', '', '', 0))
 
     e_count = run_query(conn, is_pg, "SELECT COUNT(*) FROM employees", fetch='one')
     if e_count[0] == 0:
