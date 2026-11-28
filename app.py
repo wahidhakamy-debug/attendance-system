@@ -189,7 +189,7 @@ def payroll_page():
         emp_id, name, dept, title, base_sal = e
         base_sal = float(base_sal or 0)
         att = run_query(conn, is_pg, "SELECT COUNT(DISTINCT date), COALESCE(SUM(late_minutes), 0), COALESCE(SUM(overtime_minutes), 0) FROM attendance WHERE emp_id = ? AND date LIKE ?", (emp_id, f"{month}%"), fetch='one')
-        days_present, late_m, ot_m = int(att or 0), int(att or 0), int(att or 0)
+        days_present, late_m, ot_m = (int(att[0] or 0), int(att[1] or 0), int(att[2] or 0)) if att else (0, 0, 0)
         minute_rate = base_sal / (30 * 8 * 60) if base_sal > 0 else 0
         late_deduct = round(late_m * minute_rate, 2)
         ot_bonus = round(ot_m * minute_rate * 1.5, 2)
