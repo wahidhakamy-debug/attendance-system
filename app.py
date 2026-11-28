@@ -63,6 +63,7 @@ def init_db():
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS leave_requests (id {pk}, emp_id TEXT, emp_name TEXT, req_type TEXT, req_date TEXT, duration_text TEXT, reason TEXT, status TEXT DEFAULT 'قيد المراجعة', created_at TEXT)")
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS advances (id {pk}, emp_id TEXT, emp_name TEXT, adv_type TEXT, amount REAL, deduct_month TEXT, reason TEXT, status TEXT DEFAULT 'قيد المراجعة', created_at TEXT)")
     run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS emp_documents (id {pk}, emp_id TEXT, emp_name TEXT, doc_type TEXT, doc_number TEXT, expiry_date TEXT, notes TEXT)")
+    run_query(conn, is_pg, f"CREATE TABLE IF NOT EXISTS evaluations (id {pk}, emp_id TEXT, emp_name TEXT, eval_month TEXT, score INTEGER DEFAULT 100, bonus REAL DEFAULT 0, notes TEXT, UNIQUE(emp_id, eval_month))")
 
     conn.commit()
 
