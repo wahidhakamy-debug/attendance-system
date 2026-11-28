@@ -37,12 +37,15 @@
 <body>
     <nav class="navbar no-print">
         <div class="nav-brand">🏢 شركة منبع الجنوب للتجارة</div>
-        <div class="nav-links">
+                <div class="nav-links">
             <a href="/dashboard" class="{% if page == 'dashboard' %}active{% endif %}">🏠 الرئيسية والسجل</a>
             <a href="/leaves" class="{% if page == 'leaves' %}active{% endif %}">📩 الإجازات</a>
             <a href="/advances" class="{% if page == 'advances' %}active{% endif %}">💵 السُلف والعُهد</a>
             {% if session['role'] != 'admin' %}
             <a href="/my_payslip" class="{% if page == 'my_payslip' %}active{% endif %}">🧾 كشف راتبي</a>
+            {% endif %}
+            {% if session['role'] in ('admin', 'supervisor') %}
+            <a href="/evaluations" class="{% if page == 'evaluations' %}active{% endif %}">⭐ التقييم</a>
             {% endif %}
             {% if session['role'] == 'admin' %}
             <a href="/payroll" class="{% if page == 'payroll' %}active{% endif %}">💰 الرواتب</a>
@@ -52,6 +55,7 @@
             <a href="/branches" class="{% if page == 'branches' %}active{% endif %}">📍 الفروع</a>
             {% endif %}
         </div>
+
         <div class="nav-user">
             <span>👤 {{ session['name'] }}</span>
             <a href="/logout" class="btn-logout">خروج</a>
