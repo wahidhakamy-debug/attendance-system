@@ -84,16 +84,23 @@
         <h3 style="margin:0;">📊 سجل الحضور وساعات العمل</h3>
         <div style="display:flex; gap:10px;">
             <button onclick="window.print()" class="btn" style="background:#334155; padding:10px 18px; font-size:15px;">🖨️ طباعة التقرير</button>
-            {% if session['role'] == 'admin' %}
-            <a href="/export_csv?emp_id={{ emp_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn" style="background:#16a34a; padding:10px 18px; font-size:15px; text-decoration:none;">📥 تصدير Excel</a>
+                        {% if session['role'] in ('admin', 'supervisor') %}
+            <a href="/export_csv?emp_id={{ emp_filter }}&search_name={{ search_name }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn" style="background:#16a34a; padding:10px 18px; font-size:15px; text-decoration:none;">📥 تصدير Excel</a>
             {% endif %}
         </div>
     </div>
 
-    {% if session['role'] == 'admin' %}
-    <form method="GET" action="/dashboard" class="no-print" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px; align-items:end; background:#f8fafc; padding:15px; border-radius:10px; margin-bottom:15px;">
+    {% if session['role'] in ('admin', 'supervisor') %}
+    <form method="GET" action="/dashboard" class="no-print" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; align-items:end; background:#f8fafc; padding:15px; border-radius:10px; margin-bottom:15px;">
         <div>
-            <label>الموظف</label>
+            <label>🔍 بحث بالاسم أو الرقم</label>
+            <input type="text" name="search_name" value="{{ search_name }}" placeholder="اكتب اسم الموظف..." list="emp_names_list">
+            <datalist id="emp_names_list">
+                {% for e in employees %}<option value="{{ e.1 }}">{% endfor %}
+            </datalist>
+        </div>
+        <div>
+            <label>اختر من القائمة</label>
             <select name="emp_id">
                 <option value="">-- جميع الموظفين --</option>
                 {% for e in employees %}<option value="{{ e.0 }}" {% if emp_filter == e.0 %}selected{% endif %}>{{ e.1 }}</option>{% endfor %}
@@ -107,6 +114,7 @@
         </div>
     </form>
     {% endif %}
+
 
     <div style="overflow-x:auto;">
         <table>
