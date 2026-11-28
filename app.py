@@ -308,17 +308,22 @@ def action(type):
     max_sessions = 2 if s_type == 'split' else 1
     
     if type == 'in' and not open_rec and done_today < max_sessions:
-        target_start = s_start2 if (s_type == 'split' and done_today == 1 and s_start2) else s_start1
-        now_mins = time_to_mins(t_str)
-        start_mins = time_to_mins(target_start)
-        diff_mins = now_mins - start_mins
-        if diff_mins < -720:
-            diff_mins += 1440
-        late_mins = diff_mins if diff_mins > int(s_grace) else 0
+               if s_type == 'flexible':
+            late_mins = 0
+            late_txt = "🕒 دوام مرن (منضبط)"
+        else:
+            target_start = s_start2 if (s_type == 'split' and done_today == 1 and s_start2) else s_start1
+            now_mins = time_to_mins(t_str)
+            start_mins = time_to_mins(target_start)
+            diff_mins = now_mins - start_mins
+            if diff_mins < -720:
+                diff_mins += 1440
+            late_mins = diff_mins if diff_mins > int(s_grace) else 0
+            late_txt = f"⚠️ تأخير: {format_mins(late_mins)}" if late_mins > 0 else "✅ منضبط"
+
         
         run_query(conn, is_pg, "INSERT INTO attendance (emp_id, branch_name, date, check_in, late_minutes, ip_address) VALUES (?, ?, ?, ?, ?, ?)",
                   (session['emp_id'], matched_branch[1], today, t_str, late_mins, request.remote_addr))
-        late_txt = f"⚠️ تأخير: {format_mins(late_mins)}" if late_mins > 0 else "✅ منضبط"
         flash(f'✅ تم تسجيل حضورك ({shift_name}) في ({matched_branch[1]}) الساعة {t_str} | {late_txt}')
         send_telegram(f"🟢 تسجيل حضور ({shift_name})\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {matched_branch[1]}\nالوقت: {t_str}\nالحالة: {late_txt}")
         
