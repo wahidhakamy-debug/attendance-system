@@ -307,8 +307,8 @@ def action(type):
     done_today = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE emp_id = ? AND date = ? AND check_out IS NOT NULL", (session['emp_id'], today), fetch='one')[0]
     max_sessions = 2 if s_type == 'split' else 1
     
-    if type == 'in' and not open_rec and done_today < max_sessions:
-               if s_type == 'flexible':
+           if type == 'in' and not open_rec and done_today < max_sessions:
+        if s_type == 'flexible':
             late_mins = 0
             late_txt = "🕒 دوام مرن (منضبط)"
         else:
@@ -321,12 +321,11 @@ def action(type):
             late_mins = diff_mins if diff_mins > int(s_grace) else 0
             late_txt = f"⚠️ تأخير: {format_mins(late_mins)}" if late_mins > 0 else "✅ منضبط"
 
-        
         run_query(conn, is_pg, "INSERT INTO attendance (emp_id, branch_name, date, check_in, late_minutes, ip_address) VALUES (?, ?, ?, ?, ?, ?)",
                   (session['emp_id'], matched_branch[1], today, t_str, late_mins, request.remote_addr))
         flash(f'✅ تم تسجيل حضورك ({shift_name}) في ({matched_branch[1]}) الساعة {t_str} | {late_txt}')
         send_telegram(f"🟢 تسجيل حضور ({shift_name})\nالموظف: {session['name']} ({session['emp_id']})\nالفرع: {matched_branch[1]}\nالوقت: {t_str}\nالحالة: {late_txt}")
-        
+
     elif type == 'out' and open_rec:
         w_mins = worked_span_mins(open_rec[1], t_str)
         dur_txt = format_mins(w_mins)
