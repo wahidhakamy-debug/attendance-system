@@ -139,13 +139,10 @@ def dashboard():
     now = get_ksa_time()
     today = now.strftime('%Y-%m-%d')
     emp_filter = request.args.get('emp_id', '')
-    emp_filter = request.args.get('emp_id', '')
     search_name = request.args.get('search_name', '').strip()
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
 
-    start_date = request.args.get('start_date', '')
-    end_date = request.args.get('end_date', '')
     
     conn, is_pg = get_db()
     emp_row = run_query(conn, is_pg, "SELECT COALESCE(assigned_shift, 'الوردية الصباحية') FROM employees WHERE emp_id = ?", (session['emp_id'],), fetch='one')
@@ -167,8 +164,19 @@ def dashboard():
         query += " AND e.assigned_branch = ?"
         params.append(session['assigned_branch'])
     if emp_filter:
+            if emp_filter:
         query += " AND a.emp_id = ?"
         params.append(emp_filter)
+    if search_name:
+        query += " AND (e.name LIKE ? OR e.emp_id LIKE ?)"
+        params.extend([f"%{search_name}%", f"%{search_name}%"])
+
+        query += " AND a.emp_id = ?"
+        params.append(emp_filter)
+            if search_name:
+        query += " AND (e.name LIKE ? OR e.emp_id LIKE ?)"
+        params.extend([f"%{search_name}%", f"%{search_name}%"])
+
     if start_date:
         query += " AND a.date >= ?"
         params.append(start_date)
@@ -181,14 +189,14 @@ def dashboard():
     
     stats, employees, branches = {}, [], []
     if session['role'] in ('admin', 'supervisor'):
-        if session['role'] == 'supervisor' and session.get('assigned_branch') != 'جميع الفروع':
+    if session['role'] == 'supervisor' and session.get('assigned_branch') != 'جميع الفروع':
             employees = run_query(conn, is_pg, "SELECT emp_id, name FROM employees WHERE assigned_branch = ?", (session['assigned_branch'],), fetch='all')
             branches = run_query(conn, is_pg, "SELECT id, name FROM branches WHERE name = ?", (session['assigned_branch'],), fetch='all')
         else:
             employees = run_query(conn, is_pg, "SELECT emp_id, name FROM employees", fetch='all')
             branches = run_query(conn, is_pg, "SELECT id, name FROM branches", fetch='all')
         present = run_query(conn, is_pg, "SELECT COUNT(DISTINCT emp_id) FROM attendance WHERE date = ?", (today,), fetch='one')
-        active = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE check_out IS NULL", fetch='one')
+    return render_template('dashboard.html', page='dashboard', now_time=now.strftime('%H:%M:%S'), now_date=today, open_rec=open_rec, today_done_count=today_done_count, max_sessions=max_sessions, shift_name=shift_name, records=records, stats=stats, employees=employees, branches=branches, emp_filter=emp_filter, search_name=search_name, start_date=start_date, end_date=end_date)
         pending_leaves = run_query(conn, is_pg, "SELECT COUNT(*) FROM leave_requests WHERE status = 'قيد المراجعة'", fetch='one')
         stats = {'total_emp': len(employees), 'present_today': present[0] if present else 0, 'active_now': active[0] if active else 0, 'pending_leaves': pending_leaves[0] if pending_leaves else 0}
     conn.close()
