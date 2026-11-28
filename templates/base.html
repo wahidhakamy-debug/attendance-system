@@ -9,7 +9,7 @@
         .navbar { background: #0f172a; color: white; padding: 14px 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
         .nav-brand { font-size: 19px; font-weight: bold; color: #38bdf8; }
         .nav-links { display: flex; flex-wrap: wrap; gap: 8px; }
-        .nav-links a { color: #e2e8f0; text-decoration: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 15px; transition: 0.2s; }
+        .nav-links a { color: #e2e8f0; text-decoration: none; padding: 8px 13px; border-radius: 8px; font-weight: 600; font-size: 14px; transition: 0.2s; }
         .nav-links a:hover, .nav-links a.active { background: #0284c7; color: white; }
         .nav-user { display: flex; align-items: center; gap: 12px; font-size: 14px; }
         .btn-logout { background: #dc2626; color: white; padding: 7px 14px; border-radius: 8px; text-decoration: none; font-weight: bold; }
@@ -39,9 +39,6 @@
         <div class="nav-brand">🏢 شركة منبع الجنوب للتجارة</div>
         <div class="nav-links">
             <a href="/dashboard" class="{% if page == 'dashboard' %}active{% endif %}">🏠 الرئيسية والسجل</a>
-            <a href="/leaves" class="{% if page == 'leaves' %}active{% endif %}">📩 الإجازات والاستئذان</a>
-                                                <div class="nav-links">
-            <a href="/dashboard" class="{% if page == 'dashboard' %}active{% endif %}">🏠 الرئيسية والسجل</a>
             <a href="/leaves" class="{% if page == 'leaves' %}active{% endif %}">📩 الإجازات</a>
             <a href="/advances" class="{% if page == 'advances' %}active{% endif %}">💵 السُلف والعُهد</a>
             {% if session['role'] != 'admin' %}
@@ -54,9 +51,6 @@
             <a href="/shifts" class="{% if page == 'shifts' %}active{% endif %}">🕒 الورديات</a>
             <a href="/branches" class="{% if page == 'branches' %}active{% endif %}">📍 الفروع</a>
             {% endif %}
-        </div>
-
-        </div>
         </div>
         <div class="nav-user">
             <span>👤 {{ session['name'] }}</span>
