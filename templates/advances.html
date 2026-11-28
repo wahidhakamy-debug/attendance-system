@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <h3 style="margin-top:0; color:#d97706;">💵 تقديم طلب سُلفة مالية أو عُهدة</h3>
+    <form action="/submit_advance" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: end;">
+        <div>
+            <label>نوع الطلب</label>
+            <select name="adv_type" required>
+                <option value="سُلفة مالية (تُستقطع من الراتب)">💰 سُلفة مالية (تُستقطع من الراتب)</option>
+                <option value="عُهدة عمل نقدية">🧾 عُهدة عمل نقدية</option>
+            </select>
+        </div>
+        <div><label>المبلغ المطلوب (ر.س)</label><input type="number" step="0.01" name="amount" placeholder="500" required></div>
+        <div><label>شهر الاستقطاع</label><input type="month" name="deduct_month" value="{{ curr_month }}" required></div>
+        <div><label>السبب / البيان</label><input type="text" name="reason" placeholder="اكتب سبب السُلفة أو العُهدة..." required></div>
+        <div><button type="submit" class="btn" style="background:#d97706; padding:12px; width:100%; font-size:16px;">📤 إرسال الطلب</button></div>
+    </form>
+</div>
+
+<div class="card">
+    <h3 style="margin-top:0;">📋 سجل السُلف والعُهد المالية</h3>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>الموظف</th><th>النوع</th><th>المبلغ</th><th>شهر الاستقطاع</th><th>السبب</th><th>الحالة</th>{% if session['role'] == 'admin' %}<th>القرار</th>{% endif %}</tr>
+            </thead>
+            <tbody>
+                {% for a in advances %}
+                <tr>
+                    <td><strong>{{ a.2 }}</strong></td>
+                    <td>{{ a.3 }}</td>
+                    <td><strong style="color:#0f172a;">{{ "%.2f"|format(a.4) }} ر.س</strong></td>
+                    <td><span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:6px; font-weight:bold;">{{ a.5 }}</span></td>
+                    <td>{{ a.6 }}</td>
+                    <td><strong>{{ a.7 }}</strong></td>
+                    {% if session['role'] == 'admin' %}
+                    <td style="white-space: nowrap;">
+                        <a href="/handle_advance/{{ a.0 }}/approve" style="background:#16a34a; color:white; padding:6px 10px; border-radius:6px; text-decoration:none; font-weight:bold;">✅ اعتماد</a>
+                        <a href="/handle_advance/{{ a.0 }}/reject" style="background:#f59e0b; color:white; padding:6px 10px; border-radius:6px; text-decoration:none; font-weight:bold;">❌ رفض</a>
+                        <a href="/delete_advance/{{ a.0 }}" onclick="return confirm('حذف هذا السجل؟')" style="background:#dc2626; color:white; padding:6px 10px; border-radius:6px; text-decoration:none; font-weight:bold;">🗑️ حذف</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="text-align:center; color:#64748b;">لا توجد سُلف أو عُهد مسجلة حالياً</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
