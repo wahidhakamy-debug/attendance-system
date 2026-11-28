@@ -32,6 +32,7 @@
                     <th>خصم التأخير</th>
                     <th>العمل الإضافي</th>
                     <th>مكافأة الإضافي (1.5x)</th>
+                    <th>السُلف المستقطعة</th>
                     <th>صافي الراتب المستحق</th>
                 </tr>
             </thead>
@@ -47,10 +48,11 @@
                     <td style="color:#dc2626; font-weight:bold;">- {{ "%.2f"|format(p.late_deduct) }} ر.س</td>
                     <td>{{ p.ot_txt }}</td>
                     <td style="color:#16a34a; font-weight:bold;">+ {{ "%.2f"|format(p.ot_bonus) }} ر.س</td>
+                    <td style="color:#d97706; font-weight:bold;">- {{ "%.2f"|format(p.adv_deduct) }} ر.س</td>
                     <td><span style="background:#dcfce7; color:#15803d; padding:6px 12px; border-radius:8px; font-weight:bold; font-size:16px;">{{ "%.2f"|format(p.net_salary) }} ر.س</span></td>
                 </tr>
                 {% else %}
-                <tr><td colspan="10" style="text-align:center; color:#64748b;">لا يوجد موظفون مسجلون</td></tr>
+                <tr><td colspan="11" style="text-align:center; color:#64748b;">لا يوجد موظفون مسجلون</td></tr>
                 {% endfor %}
             </tbody>
         </table>
