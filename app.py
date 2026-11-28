@@ -186,9 +186,6 @@ def dashboard():
         active = run_query(conn, is_pg, "SELECT COUNT(*) FROM attendance WHERE check_out IS NULL", fetch='one')
         pending_leaves = run_query(conn, is_pg, "SELECT COUNT(*) FROM leave_requests WHERE status = 'قيد المراجعة'", fetch='one')
         stats = {'total_emp': len(employees), 'present_today': present[0] if present else 0, 'active_now': active[0] if active else 0, 'pending_leaves': pending_leaves[0] if pending_leaves else 0}
-
-    conn.close()
-    return render_template('dashboard.html', page='dashboard', now_time=now.strftime('%H:%M:%S'), now_date=today, open_rec=open_rec, today_done_count=today_done_count, max_sessions=max_sessions, shift_name=shift_name, records=records, stats=stats, employees=employees, branches=branches, emp_filter=emp_filter, start_date=start_date, end_date=end_date)
 @app.route('/payroll')
 def payroll_page():
     if session.get('role') != 'admin':
@@ -203,16 +200,18 @@ def payroll_page():
         days_present, late_m, ot_m = (int(att[0] or 0), int(att[1] or 0), int(att[2] or 0)) if att else (0, 0, 0)
         adv_row = run_query(conn, is_pg, "SELECT COALESCE(SUM(amount), 0) FROM advances WHERE emp_id = ? AND deduct_month = ? AND status = 'معتمد ✅'", (emp_id, month), fetch='one')
         adv_deduct = round(float(adv_row[0] or 0), 2) if adv_row else 0.0
+        ev_row = run_query(conn, is_pg, "SELECT COALESCE(SUM(bonus), 0) FROM evaluations WHERE emp_id = ? AND eval_month = ?", (emp_id, month), fetch='one')
+        eval_bonus = round(float(ev_row[0] or 0), 2) if ev_row else 0.0
         minute_rate = base_sal / (30 * 8 * 60) if base_sal > 0 else 0
         late_deduct = round(late_m * minute_rate, 2)
         ot_bonus = round(ot_m * minute_rate * 1.5, 2)
-        net_salary = round(max(0, base_sal - late_deduct - adv_deduct + ot_bonus), 2)
+        net_salary = round(max(0, base_sal - late_deduct - adv_deduct + ot_bonus + eval_bonus), 2)
         payroll_data.append({
             'emp_id': emp_id, 'name': name, 'department': dept, 'job_title': title,
             'base_salary': base_sal, 'days': days_present,
             'late_txt': format_mins(late_m), 'late_deduct': late_deduct,
             'ot_txt': format_mins(ot_m), 'ot_bonus': ot_bonus,
-            'adv_deduct': adv_deduct, 'net_salary': net_salary
+            'eval_bonus': eval_bonus, 'adv_deduct': adv_deduct, 'net_salary': net_salary
         })
     conn.close()
     return render_template('payroll.html', page='payroll', month=month, payroll_data=payroll_data)
@@ -229,19 +228,26 @@ def my_payslip():
     days_present, late_m, ot_m = (int(att[0] or 0), int(att[1] or 0), int(att[2] or 0)) if att else (0, 0, 0)
     adv_row = run_query(conn, is_pg, "SELECT COALESCE(SUM(amount), 0) FROM advances WHERE emp_id = ? AND deduct_month = ? AND status = 'معتمد ✅'", (session['emp_id'], month), fetch='one')
     adv_deduct = round(float(adv_row[0] or 0), 2) if adv_row else 0.0
+    ev_row = run_query(conn, is_pg, "SELECT COALESCE(SUM(bonus), 0), COALESCE(MAX(score), 0) FROM evaluations WHERE emp_id = ? AND eval_month = ?", (session['emp_id'], month), fetch='one')
+    eval_bonus = round(float(ev_row[0] or 0), 2) if ev_row else 0.0
+    eval_score = int(ev_row[1] or 0) if ev_row else 0
     minute_rate = base_sal / (30 * 8 * 60) if base_sal > 0 else 0
     late_deduct = round(late_m * minute_rate, 2)
     ot_bonus = round(ot_m * minute_rate * 1.5, 2)
-    net_salary = round(max(0, base_sal - late_deduct - adv_deduct + ot_bonus), 2)
+    net_salary = round(max(0, base_sal - late_deduct - adv_deduct + ot_bonus + eval_bonus), 2)
     slip = {
         'emp_id': emp[0], 'name': emp[1], 'department': emp[2], 'job_title': emp[3],
         'branch': emp[4], 'shift': emp[5], 'base_salary': base_sal, 'days': days_present,
         'late_txt': format_mins(late_m), 'late_deduct': late_deduct,
         'ot_txt': format_mins(ot_m), 'ot_bonus': ot_bonus,
+        'eval_bonus': eval_bonus, 'eval_score': eval_score,
         'adv_deduct': adv_deduct, 'net_salary': net_salary
     }
     conn.close()
     return render_template('my_payslip.html', page='my_payslip', month=month, slip=slip)
+
+    conn.close()
+    return render_template('dashboard.html', page='dashboard', now_time=now.strftime('%H:%M:%S'), now_date=today, open_rec=open_rec, today_done_count=today_done_count, max_sessions=max_sessions, shift_name=shift_name, records=records, stats=stats, employees=employees, branches=branches, emp_filter=emp_filter, start_date=start_date, end_date=end_date)
 
 @app.route('/advances')
 def advances_page():
