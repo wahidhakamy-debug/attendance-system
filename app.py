@@ -121,8 +121,8 @@ def login():
         user = run_query(conn, is_pg, "SELECT emp_id, name, job_title, assigned_branch, password, role FROM employees WHERE emp_id = ?",
                          (request.form['emp_id'].strip(),), fetch='one')
         conn.close()
-        if user and check_password_hash(user, request.form['password'].strip()):
-            session['emp_id'], session['name'], session['job_title'], session['assigned_branch'], session['role'] = user, user, user, user, user
+        if user and check_password_hash(user[4], request.form['password'].strip()):
+            session['emp_id'], session['name'], session['job_title'], session['assigned_branch'], session['role'] = user[0], user[1], user[2], user[3], user[5]
             return redirect('/dashboard')
         flash('بيانات الدخول غير صحيحة')
     return render_template('login.html')
